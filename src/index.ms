@@ -31,6 +31,7 @@ export { MotionBinding, MotionOptions, MotionPlayer, motionOptions } from "./pla
 export { Composition, MotionTarget } from "./target";
 export { SpringKind, SpringConfig, SpringSimulation, springByStiffness, springByDuration, createSpring } from "./spring";
 export { DecayConfig, DecaySimulation, decayConfig, createDecay } from "./decay";
+export { ProgressCurve, sampleEasing, sampleSpring, cssLinear } from "./progress";
 export { MotionPolicy, ReduceMotion, shouldReduce } from "./policy";
 export {
 	AnimatedValue,

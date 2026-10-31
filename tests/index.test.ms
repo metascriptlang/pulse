@@ -8,9 +8,11 @@ import {
 	ValueKind,
 	createDecay,
 	createSpring,
+	cssLinear,
 	decayConfig,
 	linearKeyframe,
 	motionOptions,
+	sampleSpring,
 	springByStiffness,
 	timing,
 } from "../src/index";
@@ -63,6 +65,16 @@ test "spring and decay simulations read through the same accessor names" {
 	assert s.position(5000) > 99.9;
 	assert d.velocity(0) > 0;
 	assert s.isDone(10000);
+}
+
+test "a spring retargeted mid-flight hands a platform its sampled progress" {
+	const s = createSpring(springByStiffness(), 0, 100);
+	const moved = s.retarget(200, 50);
+	assert moved.from === s.position(200);
+	const curve = sampleSpring(moved);
+	assert curve.progress[0] === 0;
+	assert curve.progress[curve.progress.length - 1] === 1;
+	assert cssLinear(curve).startsWith("linear(0, ");
 }
 
 test "an animated value runs on a manual clock with an explicit policy" {
