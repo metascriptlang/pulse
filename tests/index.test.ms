@@ -13,7 +13,7 @@ import {
 	motionOptions,
 	springByStiffness,
 	timing,
-} from "../../src/motion/index";
+} from "../src/index";
 
 function ramp(): MotionDocument {
 	return {

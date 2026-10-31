@@ -8,7 +8,7 @@ import {
 	springByDuration,
 	springByStiffness,
 	velocity,
-} from "../../src/motion/spring";
+} from "../src/spring";
 
 function near(actual: float64, expected: float64, tolerance: float64): boolean {
 	return Math.abs(actual - expected) <= tolerance;

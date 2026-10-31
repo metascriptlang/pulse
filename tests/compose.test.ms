@@ -1,4 +1,4 @@
-import { ManualClock } from "../../src/motion/clock";
+import { ManualClock } from "../src/clock";
 import {
 	MotionClip,
 	MotionDocument,
@@ -11,9 +11,9 @@ import {
 	linearKeyframe,
 	numberValue,
 	validate,
-} from "../../src/motion/document";
-import { StaggerFrom, StaggerOptions, resolvePosition, stagger, staggerOptions } from "../../src/motion/compose";
-import { MotionBinding, MotionPlayer, motionOptions } from "../../src/motion/player";
+} from "../src/document";
+import { StaggerFrom, StaggerOptions, resolvePosition, stagger, staggerOptions } from "../src/compose";
+import { MotionBinding, MotionPlayer, motionOptions } from "../src/player";
 
 function near(a: float64, b: float64): boolean {
 	return Math.abs(a - b) <= 1e-6;

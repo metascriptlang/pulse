@@ -9,7 +9,7 @@ import {
 	colorValue,
 	linearKeyframe,
 	validate,
-} from "../../src/motion/document";
+} from "../src/document";
 
 function track(slot: string, property: string, keyframes: MotionKeyframe[]): MotionTrack {
 	return { slot, property, kind: ValueKind.Number, keyframes };

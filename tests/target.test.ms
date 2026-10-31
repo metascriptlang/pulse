@@ -1,5 +1,5 @@
-import { Easing } from "../../src/animation/easing";
-import { ManualClock } from "../../src/motion/clock";
+import { Easing } from "../src/easing";
+import { ManualClock } from "../src/clock";
 import {
 	MotionDocument,
 	MotionTrack,
@@ -8,12 +8,12 @@ import {
 	colorValue,
 	linearKeyframe,
 	numberValue,
-} from "../../src/motion/document";
-import { MotionBinding, MotionOptions, MotionPlayer, motionOptions } from "../../src/motion/player";
-import { MotionPolicy } from "../../src/motion/policy";
-import { Composition, MotionTarget } from "../../src/motion/target";
-import { AnimatedValue, decay, timing } from "../../src/motion/value";
-import { decayConfig } from "../../src/motion/decay";
+} from "../src/document";
+import { MotionBinding, MotionOptions, MotionPlayer, motionOptions } from "../src/player";
+import { MotionPolicy } from "../src/policy";
+import { Composition, MotionTarget } from "../src/target";
+import { AnimatedValue, decay, timing } from "../src/value";
+import { decayConfig } from "../src/decay";
 
 function near(a: float64, b: float64): boolean {
 	return Math.abs(a - b) <= 1e-6;

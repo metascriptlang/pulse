@@ -1,4 +1,4 @@
-import { Easing, EasingFunction, easingOr } from "../animation/easing";
+import { Easing, EasingFunction, easingOr } from "./easing";
 import { Clock } from "./clock";
 import {
 	DecayConfig,

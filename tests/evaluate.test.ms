@@ -5,8 +5,8 @@ import {
 	colorValue,
 	linearKeyframe,
 	numberValue,
-} from "../../src/motion/document";
-import { interpolate, sampleTrack } from "../../src/motion/evaluate";
+} from "../src/document";
+import { interpolate, sampleTrack } from "../src/evaluate";
 
 function near(a: float64, b: float64, tolerance: float64): boolean {
 	return Math.abs(a - b) <= tolerance;

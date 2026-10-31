@@ -1,6 +1,6 @@
-import { ManualClock } from "../../src/motion/clock";
-import { MotionDocument, MotionValue, ValueKind, linearKeyframe, numberValue } from "../../src/motion/document";
-import { MotionBinding, MotionOptions, MotionPlayer, motionOptions } from "../../src/motion/player";
+import { ManualClock } from "../src/clock";
+import { MotionDocument, MotionValue, ValueKind, linearKeyframe, numberValue } from "../src/document";
+import { MotionBinding, MotionOptions, MotionPlayer, motionOptions } from "../src/player";
 
 function near(a: float64, b: float64): boolean {
 	return Math.abs(a - b) <= 1e-6;

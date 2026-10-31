@@ -1,13 +1,13 @@
-import { Easing } from "../../src/animation/easing";
-import { ManualClock } from "../../src/motion/clock";
+import { Easing } from "../src/easing";
+import { ManualClock } from "../src/clock";
 import {
 	createDecay,
 	decayConfig,
 	isDone as decayIsDone,
 	position as decayPosition,
-} from "../../src/motion/decay";
-import { MotionPolicy, ReduceMotion } from "../../src/motion/policy";
-import { createSpring, position, springByStiffness, velocity } from "../../src/motion/spring";
+} from "../src/decay";
+import { MotionPolicy, ReduceMotion } from "../src/policy";
+import { createSpring, position, springByStiffness, velocity } from "../src/spring";
 import {
 	AnimatedValue,
 	AnimationSpec,
@@ -17,7 +17,7 @@ import {
 	sequence,
 	spring,
 	timing,
-} from "../../src/motion/value";
+} from "../src/value";
 
 function near(actual: float64, expected: float64, tolerance: float64): boolean {
 	return Math.abs(actual - expected) <= tolerance;

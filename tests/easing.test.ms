@@ -1,6 +1,6 @@
 // Ported from RN Libraries/Animated/__tests__/Easing-test.js and bezier-test.js.
 
-import { Easing, EasingFunction, bezier } from "../../src/animation/easing";
+import { Easing, EasingFunction, bezier } from "../src/easing";
 
 function near(a: number, b: number, digits: int32): boolean {
 	return Math.abs(a - b) < Math.pow(10, -(digits as number)) / 2;

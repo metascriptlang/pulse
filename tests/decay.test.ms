@@ -6,7 +6,7 @@ import {
 	isDone,
 	position,
 	velocity,
-} from "../../src/motion/decay";
+} from "../src/decay";
 
 function near(actual: float64, expected: float64, tolerance: float64): boolean {
 	return Math.abs(actual - expected) <= tolerance;

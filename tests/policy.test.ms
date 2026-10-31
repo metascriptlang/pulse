@@ -1,4 +1,4 @@
-import { MotionPolicy, ReduceMotion, shouldReduce } from "../../src/motion/policy";
+import { MotionPolicy, ReduceMotion, shouldReduce } from "../src/policy";
 
 test "System follows the policy the host sets, Always and Never ignore it" {
 	const policy = new MotionPolicy();

@@ -1,4 +1,4 @@
-import { Clock, ManualClock } from "../../src/motion/clock";
+import { Clock, ManualClock } from "../src/clock";
 
 test "a manual clock starts at zero and advances by the given milliseconds" {
 	const clock = new ManualClock();

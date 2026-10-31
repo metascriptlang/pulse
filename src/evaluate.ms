@@ -1,4 +1,4 @@
-import { bezier } from "../animation/easing";
+import { bezier } from "./easing";
 import { MotionColor, MotionKeyframe, MotionTrack, MotionValue, ValueKind, colorValue, numberValue } from "./document";
 
 function clamp01(x: float64): float64 {
