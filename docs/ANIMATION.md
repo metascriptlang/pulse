@@ -1,11 +1,14 @@
 # Animation — one motion model for Neon, Void and the editor
 
-State: design agreed on 2026-10-11, prototyped on 2026-10-12, built in `src/motion/` (entry
-`src/motion/index.ms`, tests `tests/motion/`) from 2026-10-29. `src/animation/` is something else: React Native's `Animated` surface on Neon signals (ROADMAP
-Bundle 5). The scene clocks in `src/components/scene2d.ms` (`Anim`) and `src/components/scene3d/animation.ms`
-(`ObjectAnimation`, `MeshFrameAnimation`) are also separate, and each plays Void's own frame data.
-The person decided on 2026-10-31 that this core replaces their clocks and hands motion to each
-platform's engine where one exists (§Decided); where the core lives is open again (§Open).
+State: design agreed on 2026-10-11, prototyped on 2026-10-12, built in Neon's `src/motion/` from
+2026-10-29, and moved with its history into this repo, Pulse, on 2026-11-01 (entry `src/index.ms`,
+tests `tests/`). The adapters live with their consumers: Neon's `src/motion/neon.ms` and `waapi.ms`,
+and the Void adapter `void.ms`, in Neon until Void takes it. The older animation code is separate:
+Neon's `src/animation/` is React Native's `Animated` surface on Neon signals, and Neon's
+`src/components/scene2d.ms` (`Anim`) and `src/components/scene3d/animation.ms` (`ObjectAnimation`,
+`MeshFrameAnimation`) play Void's own frame data. The person decided on 2026-10-31 that this engine
+replaces their clocks and hands motion to each platform's engine where one exists (§Decided).
+Paths below without a repo name are Neon's unless they name a Pulse module.
 
 ## What it has to be
 
@@ -220,7 +223,7 @@ timeline the editor scrubs must be reproducible, while a live gesture keeps its 
 | E | interactive motion: spring, gesture, retarget, Neon reactivity | interrupts, disposal and ownership right |
 | F | editor proof in Lightcube: edit, save, reopen | round-trip loses no structure; playback uses the same document |
 | G | a Neon app in the browser plays through WAAPI: `useMotion` and `useAnimatedValue` bind DOM elements, merged keyframes per CSS property, stagger as `delay`, spring as `linear()`, no JS master tick when every track is handed over; fixes found on 2026-10-31: `bezier()` builds its table and closures on every sample (`easing.ms:50-79`), `commitStyles` swallows its error (`waapi.ms:362`) | Chrome shows no per-frame style write from JS for a handed-over track |
-| H | Void bindings become data (node, property); a rotation binding writes a quaternion, not one Euler axis read back through `eulerOf` (`void.ms:164-168`); the core, `easing.ms` and `void.ms` move to where §Open decides, while `neon.ms` and `waapi.ms` stay in Neon with closure bindings | Void standalone imports the core without Neon |
+| H | Void bindings become data (node, property); a rotation binding writes a quaternion, not one Euler axis read back through `eulerOf` (`void.ms:164-168`); `void.ms` moves into Void, importing Pulse, while `neon.ms` and `waapi.ms` stay in Neon with closure bindings | Void standalone imports Pulse without Neon |
 | I | one system for UI motion: derived values (interpolate, arithmetic, `diffClamp`), gesture and scroll events, 2D values, `parallel` and `loop`; `Presence` and `LayoutAnimation` (native and browser) rebuilt on the core; every consumer of `src/animation/` moved (navigation, drawer, header, collapsible, pageView, examples, tests), then `src/animation/` deleted except `frame.ms`; Void's sprite `Anim` clock and `ObjectAnimation`/`MeshFrameAnimation` clocks replaced by the core, which drives Void's glTF and mesh-frame samplers by time and weight | every former consumer runs on the core; a skinned glTF driven by the core matches today's `Clip` crossfade; cost per joint measured against `syncPose` |
 | J | platform engines: Core Animation on macOS and iOS, DirectComposition on Windows, for `transform` and `opacity` | motion stays smooth while the app thread is blocked on purpose |
 | later | Rive-style state machine, interchange | only when a workflow needs it |
@@ -284,13 +287,11 @@ The person, 2026-10-30 and 2026-10-31:
   `useAnimatedValue` are sugar for Neon. The engine's single-value API stays
   `value.animate(spring(…))`, with `value.set(v)` meaning an immediate value.
 - **The three layers and criterion 9** above, built in the order G to J.
+- **The engine is its own repo, Pulse** (2026-11-01, MIT): it belongs to neither Neon nor Void.
+  Consumers name it in `build.ms` `deps` as `"pulse": "file:../pulse"`.
 
 ## Open
 
-- **Where the core lives.** Decided as `void` on 2026-10-31, reopened the same day: `void/CLAUDE.md`
-  rules Void a thin GPU layer with "No scene graph, ECS, physics, asset pipeline", while the same
-  repo carries `void2d`, `void3d` and their animation clocks. The code allows the move (the core
-  and `easing.ms` import nothing from Neon; nothing in Void imports Neon).
 - **Void off the app's thread.** Left out of the target (§Where it runs) until the compiler has a
   thread pinned to one OS thread.
 
