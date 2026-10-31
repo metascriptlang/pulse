@@ -1,3 +1,10 @@
+import {
+	DerivedValue,
+	InterpolationConfig,
+	Listeners,
+	ValueSource,
+	interpolated,
+} from "./derived";
 import { Easing, EasingFunction, easingOr } from "./easing";
 import { Clock } from "./clock";
 import {
@@ -434,15 +441,6 @@ class Run {
 	}
 }
 
-class Listener {
-	callback: (value: float64) => void;
-	live: boolean = true;
-
-	constructor(callback: (value: float64) => void) {
-		this.callback = callback;
-	}
-}
-
 const LABEL = "an animated value";
 
 export class AnimatedValue {
@@ -452,7 +450,7 @@ export class AnimatedValue {
 	private running: Run | null = null;
 	private onEnd: ((finished: boolean) => void) | null = null;
 	private frameId: int32 = 0;
-	private listeners: Listener[] = [];
+	private listeners: Listeners = new Listeners();
 	private isDisposed: boolean = false;
 	private target: MotionTarget | null;
 	private composition: Composition;
@@ -567,23 +565,26 @@ export class AnimatedValue {
 
 	subscribe(callback: (value: float64) => void): () => void {
 		this.requireAlive();
-		const listener = new Listener(callback);
-		this.listeners.push(listener);
-		return (): void => {
-			listener.live = false;
-			this.listeners = this.listeners.filter(
-				(other: Listener): boolean => other !== listener,
-			);
+		return this.listeners.add(callback);
+	}
+
+	source(): ValueSource {
+		return {
+			get: (): float64 => this.get(),
+			subscribe: (callback: (value: float64) => void): (() => void) =>
+				this.subscribe(callback),
 		};
+	}
+
+	interpolate(config: InterpolationConfig): DerivedValue {
+		this.requireAlive();
+		return interpolated(this.source(), config);
 	}
 
 	dispose(): void {
 		this.requireAlive();
 		this.isDisposed = true;
-		for (const listener of this.listeners) {
-			listener.live = false;
-		}
-		this.listeners = [];
+		this.listeners.clear();
 		this.interrupt();
 		this.release();
 	}
@@ -638,9 +639,7 @@ export class AnimatedValue {
 			return;
 		}
 		this.value = value;
-		for (const listener of this.listeners.slice(0)) {
-			if (listener.live) { listener.callback(value); }
-		}
+		this.listeners.notify(value);
 	}
 
 	private step(run: Run, now: float64): void {
