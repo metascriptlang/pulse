@@ -1,5 +1,8 @@
 import {
 	AnimatedValue,
+	AnimatedValueXY,
+	EventPayload,
+	Extrapolate,
 	ManualClock,
 	MotionDocument,
 	MotionPlayer,
@@ -8,12 +11,18 @@ import {
 	ValueKind,
 	createDecay,
 	createSpring,
+	animation,
 	cssLinear,
 	decayConfig,
+	diffClamp,
+	event,
 	linearKeyframe,
+	loop,
 	motionOptions,
+	parallel,
 	sampleSpring,
 	springByStiffness,
+	staggered,
 	timing,
 } from "../src/index";
 
@@ -87,4 +96,38 @@ test "an animated value runs on a manual clock with an explicit policy" {
 	assert value.get() === 10;
 	assert manual.pending() === 0;
 	value.dispose();
+}
+
+test "derived values, events, composites and a 2D value through the public entry" {
+	const manual = new ManualClock();
+	const policy = new MotionPolicy();
+	const scrollY = new AnimatedValue(0, manual.clock, policy);
+	const header = scrollY.interpolate({
+		inputRange: [0, 100],
+		outputRange: [100, 50],
+		extrapolate: Extrapolate.Clamp,
+	});
+	const hidden = diffClamp(scrollY.source(), 0, 50);
+	const onScroll = event({ y: scrollY });
+	const scrolled: EventPayload = {
+		x: 0,
+		y: 200,
+		width: 0,
+		height: 0,
+		contentWidth: 0,
+		contentHeight: 0,
+	};
+	onScroll(scrolled);
+	assert header.get() === 50 && hidden.get() === 50;
+	const pan = new AnimatedValueXY({ x: 0, y: 0 }, manual.clock, policy);
+	const spin = new AnimatedValue(0, manual.clock, policy);
+	let ended = false;
+	parallel([
+		staggered(10, [animation(pan.x, timing(1, { duration: 10 }))], manual.clock, policy),
+		loop(animation(spin, timing(1, { duration: 10 })), 2),
+	]).start((finished: boolean): void => { ended = finished; });
+	manual.advance(10);
+	manual.advance(10);
+	assert ended && pan.get().x === 1 && spin.get() === 1;
+	assert manual.pending() === 0;
 }

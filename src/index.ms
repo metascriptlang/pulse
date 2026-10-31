@@ -45,3 +45,24 @@ export {
 	delay,
 	repeat,
 } from "./value";
+export {
+	DerivedValue,
+	Extrapolate,
+	InterpolationConfig,
+	ValueSource,
+	add,
+	diffClamp,
+	divide,
+	modulo,
+	multiply,
+	subtract,
+} from "./derived";
+export {
+	CompositeAnimation,
+	animation,
+	loop,
+	parallel,
+	staggered,
+} from "./composite";
+export { AnimatedValueXY, PointXY } from "./valueXY";
+export { EventMapping, EventPayload, event } from "./event";
