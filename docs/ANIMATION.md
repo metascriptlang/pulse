@@ -93,6 +93,10 @@ Sources: `~/projects/refs-animation/` (tarballs; `COMMITS` there): Theatre `6ea8
 | reduced motion | `policy.ms` | Reanimated `animation/utilCommon.ts:113-132,460-478` |
 | browser execution | `waapi.ms` | anime `waapi/waapi.js:127-162,231-235,396-505`, `waapi/composition.js:36` |
 | Neon ownership | `neon.ms` | Neon's SR-3 (`docs/REFERENCE.md`) over Solid 2.0 `signals.ts:92-101` |
+| derived values | Pulse `derived.ms` | React Native `693e9628e8c` `Libraries/Animated/nodes/AnimatedInterpolation.js:43-151,270-322`, `AnimatedAddition.js:42-44` (and subtraction, multiplication), `AnimatedDivision.js:46-60`, `AnimatedModulo.js:36-40`, `AnimatedDiffClamp.js:39,53-59` |
+| composites | Pulse `composite.ms` | React Native `AnimatedImplementation.js` `sequenceImpl` :305-361, `parallelImpl` :368-434, `delayImpl` :436-444, `staggerImpl` :446-455, `loopImpl` :463-517 |
+| 2D value | Pulse `valueXY.ms` | React Native `nodes/AnimatedValueXY.js:80-185`, `maybeVectorAnim` :106-126 |
+| event mapping | Pulse `event.ms` | React Native `AnimatedEvent.js:218-257` |
 
 Nothing traced so far needed a **NEW MECHANISM**: every part is a port of one of these.
 
@@ -229,6 +233,9 @@ timeline the editor scrubs must be reproducible, while a live gesture keeps its 
 | later | Rive-style state machine, interchange | only when a workflow needs it |
 
 F belongs to Lightcube and is built there, not in Neon. G to J run in that order (2026-10-31).
+I's engine part stands in Pulse (2026-11-01): derived values (`interpolate`, arithmetic,
+`diffClamp`), event mapping, the 2D value and `parallel`, `staggered` and `loop` over animated
+values; moving the consumers and deleting `src/animation/` remain.
 
 ## Prototype, 2026-10-12
 
