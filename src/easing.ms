@@ -47,36 +47,57 @@ function newtonRaphson(x: number, guess: number, x1: number, x2: number): number
 	return t;
 }
 
-export function bezier(x1: number, y1: number, x2: number, y2: number): EasingFunction {
+function splineSample(index: int32, x1: number, x2: number): number {
+	return calcBezier((index as number) * SAMPLE_STEP_SIZE, x1, x2);
+}
+
+function tForX(x: number, x1: number, x2: number): number {
+	let intervalStart = 0.0;
+	let current: int32 = 1;
+	const last = SPLINE_TABLE_SIZE - 1;
+	while (current !== last && splineSample(current, x1, x2) <= x) {
+		intervalStart += SAMPLE_STEP_SIZE;
+		current += 1;
+	}
+	current -= 1;
+	const low = splineSample(current, x1, x2);
+	const dist = (x - low) / (splineSample(current + 1, x1, x2) - low);
+	const guess = intervalStart + dist * SAMPLE_STEP_SIZE;
+	const slope = bezierSlope(guess, x1, x2);
+	if (slope >= NEWTON_MIN_SLOPE) { return newtonRaphson(x, guess, x1, x2); }
+	if (slope === 0.0) { return guess; }
+	return binarySubdivide(
+		x,
+		intervalStart,
+		intervalStart + SAMPLE_STEP_SIZE,
+		x1,
+		x2,
+	);
+}
+
+function requireBezierX(x1: number, x2: number): void {
 	if (!(x1 >= 0 && x1 <= 1 && x2 >= 0 && x2 <= 1)) {
 		throw new Error("bezier x values must be in [0, 1] range");
 	}
-	const samples: number[] = [];
-	for (let i: int32 = 0; i < SPLINE_TABLE_SIZE; i += 1) {
-		samples.push(calcBezier((i as number) * SAMPLE_STEP_SIZE, x1, x2));
-	}
-	const tForX = (x: number): number => {
-		let intervalStart = 0.0;
-		let current: int32 = 1;
-		const last = SPLINE_TABLE_SIZE - 1;
-		while (current !== last && samples[current] <= x) {
-			intervalStart += SAMPLE_STEP_SIZE;
-			current += 1;
-		}
-		current -= 1;
-		const dist = (x - samples[current]) / (samples[current + 1] - samples[current]);
-		const guess = intervalStart + dist * SAMPLE_STEP_SIZE;
-		const slope = bezierSlope(guess, x1, x2);
-		if (slope >= NEWTON_MIN_SLOPE) { return newtonRaphson(x, guess, x1, x2); }
-		if (slope === 0.0) { return guess; }
-		return binarySubdivide(x, intervalStart, intervalStart + SAMPLE_STEP_SIZE, x1, x2);
-	};
-	return (x: number): number => {
-		if (x1 === y1 && x2 === y2) { return x; }
-		if (x === 0) { return 0; }
-		if (x === 1) { return 1; }
-		return calcBezier(tForX(x), y1, y2);
-	};
+}
+
+export function bezierAt(
+	x1: number,
+	y1: number,
+	x2: number,
+	y2: number,
+	x: number,
+): number {
+	requireBezierX(x1, x2);
+	if (x1 === y1 && x2 === y2) { return x; }
+	if (x === 0) { return 0; }
+	if (x === 1) { return 1; }
+	return calcBezier(tForX(x, x1, x2), y1, y2);
+}
+
+export function bezier(x1: number, y1: number, x2: number, y2: number): EasingFunction {
+	requireBezierX(x1, x2);
+	return (x: number): number => bezierAt(x1, y1, x2, y2, x);
 }
 
 let easeCurve: EasingFunction | null = null;

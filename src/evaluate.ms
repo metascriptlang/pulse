@@ -1,4 +1,4 @@
-import { bezier } from "./easing";
+import { bezierAt } from "./easing";
 import { MotionColor, MotionKeyframe, MotionTrack, MotionValue, ValueKind, colorValue, numberValue } from "./document";
 
 function clamp01(x: float64): float64 {
@@ -72,8 +72,14 @@ export function interpolate(left: MotionValue, right: MotionValue, progression: 
 function between(left: MotionKeyframe, right: MotionKeyframe, time: float64): MotionValue {
 	if (!left.connectedRight) { return left.value; }
 	const local = (time - left.time) / (right.time - left.time);
-	const curve = bezier(left.handles.rightX, left.handles.rightY, right.handles.leftX, right.handles.leftY);
-	return interpolate(left.value, right.value, curve(local));
+	const eased = bezierAt(
+		left.handles.rightX,
+		left.handles.rightY,
+		right.handles.leftX,
+		right.handles.leftY,
+		local,
+	);
+	return interpolate(left.value, right.value, eased);
 }
 
 export function sampleTrack(track: MotionTrack, time: float64): MotionValue {

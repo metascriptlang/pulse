@@ -73,6 +73,16 @@ test "bezier handles shape the progression" {
 	assert near(at(track, 100), 100, 1e-9);
 }
 
+test "a segment samples its handles' bezier exactly" {
+	let left = linearKeyframe("a", 0, 0);
+	let right = linearKeyframe("b", 100, 100);
+	left = { ...left, handles: { leftX: 0, leftY: 0, rightX: 0.42, rightY: 0 } };
+	right = { ...right, handles: { leftX: 1, leftY: 1, rightX: 0, rightY: 0 } };
+	const track = numbers([left, right]);
+	assert at(track, 50) === 0.31535681257253934 * 100;
+	assert at(track, 13) === 0.027975713147489492 * 100;
+}
+
 test "a handle y outside [0, 1] overshoots" {
 	let left = linearKeyframe("a", 0, 0);
 	let right = linearKeyframe("b", 100, 100);

@@ -1,6 +1,6 @@
 // Ported from RN Libraries/Animated/__tests__/Easing-test.js and bezier-test.js.
 
-import { Easing, EasingFunction, bezier } from "../src/easing";
+import { Easing, EasingFunction, bezier, bezierAt } from "../src/easing";
 
 function near(a: number, b: number, digits: int32): boolean {
 	return Math.abs(a - b) < Math.pow(10, -(digits as number)) / 2;
@@ -84,4 +84,64 @@ test "bezier: linear, extremes, symmetry, and range check" {
 	try { bezier(0.5, 0.5, -5, 0.5); } catch (e) { threw = true; }
 	assert threw, "x out of range throws";
 	assert near(Easing.ease(0.5), bezier(0.42, 0, 1, 1)(0.5), 6);
+}
+
+test "bezierAt gives the table-built curve's values bit for bit, with no curve built" {
+	const handles: number[][] = [
+		[0.25, 0.1, 0.25, 1],
+		[0.42, 0, 1, 1],
+		[0.68, -0.55, 0.27, 1.55],
+		[0.9, 0, 0.1, 1],
+		[0.95, 0.05, 0.99, 0.1],
+	];
+	const xs: number[] = [0.05, 0.13, 0.31, 0.5, 0.77, 0.96, 0.999];
+	const recorded: number[][] = [
+		[
+			0.03295154130590043, 0.14612555730742216, 0.5327325175550437,
+			0.802403387584857, 0.9670385062684344, 0.9991252593157979,
+			0.999999466341604,
+		],
+		[
+			0.004474615295891681, 0.027975713147489492, 0.13734955234760832,
+			0.31535681257253934, 0.6494450313709403, 0.933834037931688,
+			0.9982843517685093,
+		],
+		[
+			-0.037039730707276154, -0.07928541147347344, -0.039502650125060976,
+			0.5965962920655999, 1.0919680778580254, 1.0282597959592972,
+			1.0007523030575298,
+		],
+		[
+			0.0010924851540558983, 0.008228660752439134, 0.06541853612167686,
+			0.5, 0.9696297503028044, 0.9993094406676305, 0.9999995880025313,
+		],
+		[
+			0.0026819144346507976, 0.0072575193756056, 0.019956553657745135,
+			0.041403559541058246, 0.11995271639631012, 0.4003331961676815,
+			0.9215934969866338,
+		],
+	];
+	for (let i: int32 = 0; i < handles.length; i += 1) {
+		const h = handles[i];
+		const curve = bezier(h[0], h[1], h[2], h[3]);
+		for (let k: int32 = 0; k < xs.length; k += 1) {
+			const got = bezierAt(h[0], h[1], h[2], h[3], xs[k]);
+			assert got === recorded[i][k],
+				"handles " + i.toString() + " x " + xs[k].toString() + " got " +
+					got.toString();
+			assert curve(xs[k]) === got;
+		}
+	}
+}
+
+test "bezierAt returns x itself for linear handles and keeps the range check" {
+	for (let k: int32 = 0; k <= 20; k += 1) {
+		const x = (k as number) / 20;
+		assert bezierAt(1.0 / 3.0, 1.0 / 3.0, 2.0 / 3.0, 2.0 / 3.0, x) === x;
+	}
+	assert bezierAt(0.25, 0.1, 0.25, 1, 0) === 0;
+	assert bezierAt(0.25, 0.1, 0.25, 1, 1) === 1;
+	let threw = false;
+	try { bezierAt(0.5, 0.5, -5, 0.5, 0.5); } catch (e) { threw = true; }
+	assert threw, "x out of range throws";
 }
