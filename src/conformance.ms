@@ -2,6 +2,7 @@ import { Clock } from "./clock";
 import { CompositeAnimation } from "./composite";
 import { DerivedValue, ValueSource } from "./derived";
 import { MotionDocument } from "./document";
+import { WritableValue } from "./event";
 import { MotionPolicy } from "./policy";
 import { Composition } from "./target";
 import { AnimationSpec } from "./value";
@@ -185,6 +186,11 @@ export class ConformanceScene {
 	source(name: string): ValueSource {
 		const value = this.value(name);
 		return { get: value.get, subscribe: value.subscribe };
+	}
+
+	writable(name: string): WritableValue {
+		const value = this.value(name);
+		return { get: value.get, set: value.set };
 	}
 
 	animate(name: string, spec: AnimationSpec): void {

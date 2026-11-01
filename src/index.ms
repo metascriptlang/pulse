@@ -67,4 +67,10 @@ export {
 	staggered,
 } from "./composite";
 export { AnimatedValueXY, PointXY } from "./valueXY";
-export { EventMapping, EventPayload, event } from "./event";
+export {
+	EventMapping,
+	EventPayload,
+	EventValue,
+	WritableValue,
+	event,
+} from "./event";

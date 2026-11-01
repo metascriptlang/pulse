@@ -12,6 +12,7 @@ import { loop, parallel, staggered } from "./composite";
 import { decayConfig } from "./decay";
 import { Extrapolate, add, diffClamp, interpolated } from "./derived";
 import { MotionDocument, ValueKind, linearKeyframe } from "./document";
+import { EventPayload, event } from "./event";
 import { Easing } from "./easing";
 import { ReduceMotion } from "./policy";
 import { springByDuration, springByStiffness } from "./spring";
@@ -571,9 +572,20 @@ function valueXYCases(): ConformanceCase[] {
 					s.animate("x", linear(100, 1000));
 				}),
 				at(300, (s: ConformanceScene): void => {
-					s.value("x").set(10);
-					s.value("y").set(20);
-					s.record("listener");
+					const onScroll = event(
+						{ x: s.writable("x"), y: s.writable("y") },
+						(payload: EventPayload): void => {
+							s.record("listener");
+						},
+					);
+					onScroll({
+						x: 10,
+						y: 20,
+						width: 0,
+						height: 0,
+						contentWidth: 0,
+						contentHeight: 0,
+					});
 				}),
 			],
 			checkpoints: [300, 600],

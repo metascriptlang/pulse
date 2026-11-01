@@ -9,17 +9,29 @@ export struct EventPayload {
 	contentHeight: float64;
 }
 
-export interface EventMapping {
-	x?: AnimatedValue;
-	y?: AnimatedValue;
-	width?: AnimatedValue;
-	height?: AnimatedValue;
-	contentWidth?: AnimatedValue;
-	contentHeight?: AnimatedValue;
+export interface WritableValue {
+	get: () => float64;
+	set: (value: float64) => void;
 }
 
-function drive(value: AnimatedValue | null, to: float64): void {
-	if (value !== null) { value.set(to); }
+export type EventValue = AnimatedValue | WritableValue;
+
+export interface EventMapping {
+	x?: EventValue;
+	y?: EventValue;
+	width?: EventValue;
+	height?: EventValue;
+	contentWidth?: EventValue;
+	contentHeight?: EventValue;
+}
+
+function drive(value: EventValue | null, to: float64): void {
+	if (value === null) { return; }
+	if (value instanceof AnimatedValue) {
+		value.set(to);
+		return;
+	}
+	value.set(to);
 }
 
 export function event(

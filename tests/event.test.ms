@@ -2,7 +2,7 @@ import { Easing } from "../src/easing";
 import { ManualClock } from "../src/clock";
 import { MotionPolicy } from "../src/policy";
 import { AnimatedValue, timing } from "../src/value";
-import { EventPayload, event } from "../src/event";
+import { EventPayload, WritableValue, event } from "../src/event";
 
 function payload(x: float64, y: float64): EventPayload {
 	return { x, y, width: 320, height: 480, contentWidth: 320, contentHeight: 2000 };
@@ -43,6 +43,18 @@ test "every field of the payload can drive a value" {
 	assert x.get() === 7 && y.get() === 9;
 	assert width.get() === 320 && height.get() === 480;
 	assert contentWidth.get() === 320 && contentHeight.get() === 2000;
+}
+
+test "a field drives any writable value, not only an animated one" {
+	const clock = new ManualClock();
+	const x = valueAt(0, clock);
+	let shownY: float64 = 0;
+	const elementY: WritableValue = {
+		get: (): float64 => shownY,
+		set: (to: float64): void => { shownY = to; },
+	};
+	event({ x, y: elementY })(payload(4, 12));
+	assert x.get() === 4 && shownY === 12;
 }
 
 test "an unmapped field leaves values alone and an event stops a running animation" {
