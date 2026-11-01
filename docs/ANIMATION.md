@@ -183,8 +183,8 @@ the scroller's content); Pulse computes the progress, so every platform shares o
 
 | platform | scroll and view time sources |
 |---|---|
-| browser | handed to `ScrollTimeline` / `ViewTimeline` with the same axis, range and inset, so the browser drives the playhead from scroll; compositor eligibility follows the property rules of the row above (not traced in browser source for scroll timelines). The hand-over is a later Neon step; until it lands, `BrowserMotionPlayer` gives `source` to its master player only (Neon `waapi.ms:473`) while its WAAPI tracks run on time, so a scroll source there is not yet supported |
-| every other platform | the evaluator reads the host's offsets once per frame of the player's clock and seeks the playhead; no platform engine above takes a scroll position |
+| browser | Neon's `BrowserMotionPlayer` hands its WAAPI tracks to `ScrollTimeline` / `ViewTimeline` (Neon `616bd632`) with the same axis, range and inset, `fill: "both"`, and a numeric duration and delay that Chrome converts to proportions (`duration: "auto"` with a ms delay throws NotSupportedError); while the timeline is inactive the last value is written inline, because Chrome drops the effect. Where the classes are absent, or the source is not a real element, the whole player runs on the evaluator. Compositor eligibility follows the property rules above (not traced in browser source for scroll timelines) |
+| every other platform | the evaluator reads the host's offsets once per frame of the player's clock and seeks the playhead; Neon's native layer player runs its tracks on the evaluator on a scroll source (Neon `fa55838d`), since Core Animation and DirectComposition take no scroll position |
 
 A retarget samples position and velocity from the core's closed form, cancels what the platform is
 running and hands over the new motion, as motion's `NativeAnimationExtended.ts:119-145` does, so
