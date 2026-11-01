@@ -1,9 +1,12 @@
 import {
+	ColorInterpolationConfig,
+	DerivedColor,
 	DerivedValue,
 	InterpolationConfig,
 	Listeners,
 	ValueSource,
 	interpolated,
+	interpolatedColor,
 } from "./derived";
 import { Easing, EasingFunction, easingOr } from "./easing";
 import { Clock } from "./clock";
@@ -450,7 +453,7 @@ export class AnimatedValue {
 	private running: Run | null = null;
 	private onEnd: ((finished: boolean) => void) | null = null;
 	private frameId: int32 = 0;
-	private listeners: Listeners = new Listeners();
+	private listeners: Listeners<float64> = new Listeners<float64>();
 	private isDisposed: boolean = false;
 	private target: MotionTarget | null;
 	private composition: Composition;
@@ -579,6 +582,11 @@ export class AnimatedValue {
 	interpolate(config: InterpolationConfig): DerivedValue {
 		this.requireAlive();
 		return interpolated(this.source(), config);
+	}
+
+	interpolateColor(config: ColorInterpolationConfig): DerivedColor {
+		this.requireAlive();
+		return interpolatedColor(this.source(), config);
 	}
 
 	dispose(): void {

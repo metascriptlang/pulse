@@ -46,6 +46,8 @@ export {
 	repeat,
 } from "./value";
 export {
+	ColorInterpolationConfig,
+	DerivedColor,
 	DerivedValue,
 	Extrapolate,
 	InterpolationConfig,

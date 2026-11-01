@@ -1,4 +1,6 @@
 import { Easing } from "../src/easing";
+import { MotionColor, colorValue } from "../src/document";
+import { interpolate } from "../src/evaluate";
 import { ManualClock } from "../src/clock";
 import { MotionPolicy } from "../src/policy";
 import { AnimatedValue, timing } from "../src/value";
@@ -230,4 +232,111 @@ test "a disposed derived value stops following and refuses use" {
 	assert throws((): void => { out.get(); }) ===
 		"motion: a DerivedValue is used after dispose";
 	assert near(input.get(), 1);
+}
+
+function sameColor(actual: MotionColor, expected: MotionColor): boolean {
+	return near(actual.r, expected.r) && near(actual.g, expected.g) &&
+		near(actual.b, expected.b) && near(actual.a, expected.a);
+}
+
+function oklabAt(
+	from: MotionColor,
+	to: MotionColor,
+	progress: float64,
+): MotionColor {
+	return interpolate(
+		colorValue(from.r, from.g, from.b, from.a),
+		colorValue(to.r, to.g, to.b, to.a),
+		progress,
+	).color;
+}
+
+const RED: MotionColor = { r: 1, g: 0, b: 0, a: 1 };
+const BLUE: MotionColor = { r: 0, g: 0, b: 1, a: 0.5 };
+const WHITE: MotionColor = { r: 1, g: 1, b: 1, a: 1 };
+
+test "a colour output range mixes each segment in Oklab" {
+	const input = valueAt(0);
+	const tint = input.interpolateColor({
+		inputRange: [0, 10, 20],
+		outputRange: [RED, BLUE, WHITE],
+	});
+	assert sameColor(tint.get(), oklabAt(RED, BLUE, 0));
+	input.set(5);
+	assert sameColor(tint.get(), oklabAt(RED, BLUE, 0.5));
+	assert !near(tint.get().r, 0.5), "Oklab, not an sRGB mix";
+	input.set(15);
+	assert sameColor(tint.get(), oklabAt(BLUE, WHITE, 0.5));
+}
+
+test "a colour range clamps, extends and eases like a number range" {
+	const input = valueAt(-5);
+	const dim: MotionColor = { r: 0.2, g: 0.2, b: 0.2, a: 1 };
+	const mid: MotionColor = { r: 0.4, g: 0.4, b: 0.4, a: 1 };
+	const clamped = input.interpolateColor({
+		inputRange: [0, 10],
+		outputRange: [dim, mid],
+		extrapolate: Extrapolate.Clamp,
+	});
+	const extended = input.interpolateColor({
+		inputRange: [0, 10],
+		outputRange: [dim, mid],
+	});
+	const eased = input.interpolateColor({
+		inputRange: [0, 10],
+		outputRange: [dim, mid],
+		easing: Easing.quad,
+	});
+	assert sameColor(clamped.get(), oklabAt(dim, mid, 0));
+	assert sameColor(extended.get(), oklabAt(dim, mid, -0.5));
+	input.set(20);
+	assert sameColor(clamped.get(), oklabAt(dim, mid, 1));
+	assert sameColor(extended.get(), oklabAt(dim, mid, 2));
+	input.set(5);
+	assert sameColor(eased.get(), oklabAt(dim, mid, 0.25));
+}
+
+test "a colour follows a derived input and notifies on change only" {
+	const input = valueAt(0);
+	const unit = input.interpolate({ inputRange: [0, 100], outputRange: [0, 1] });
+	const tint = unit.interpolateColor({
+		inputRange: [0, 1],
+		outputRange: [RED, BLUE],
+		extrapolate: Extrapolate.Clamp,
+	});
+	let calls: int32 = 0;
+	tint.subscribe((c: MotionColor): void => { calls += 1; });
+	input.set(50);
+	assert sameColor(tint.get(), oklabAt(RED, BLUE, 0.5));
+	input.set(100);
+	input.set(150);
+	assert calls === 2;
+	tint.dispose();
+	input.set(0);
+	assert calls === 2;
+	assert throws((): void => { tint.get(); }) ===
+		"motion: a DerivedColor is used after dispose";
+}
+
+test "colour ranges with no meaning are refused" {
+	const input = valueAt(0);
+	assert throws((): void => {
+		input.interpolateColor({
+			inputRange: [0, 1],
+			outputRange: [RED, BLUE],
+			extrapolateRight: Extrapolate.Identity,
+		});
+	}) === "motion: a colour interpolation cannot extrapolate by identity";
+	assert throws((): void => {
+		input.interpolateColor({ inputRange: [0, 1, 2], outputRange: [RED, BLUE] });
+	}) === "motion: inputRange (3) and outputRange (2) must have the same length";
+	assert throws((): void => {
+		input.interpolateColor({ inputRange: [0], outputRange: [RED] });
+	}) === "motion: outputRange must have at least 2 elements";
+	assert throws((): void => {
+		input.interpolateColor({
+			inputRange: [0, 1],
+			outputRange: [RED, { r: NaN, g: 0, b: 0, a: 1 }],
+		});
+	}) === "motion: outputRange must hold finite colour channels";
 }

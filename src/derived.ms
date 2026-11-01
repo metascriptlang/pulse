@@ -1,29 +1,31 @@
+import { MotionColor, MotionValue, colorValue } from "./document";
 import { Easing, EasingFunction, easingOr } from "./easing";
+import { interpolate } from "./evaluate";
 
-class Listener {
-	callback: (value: float64) => void;
+class Listener<T> {
+	callback: (value: T) => void;
 	live: boolean = true;
 
-	constructor(callback: (value: float64) => void) {
+	constructor(callback: (value: T) => void) {
 		this.callback = callback;
 	}
 }
 
-export class Listeners {
-	private entries: Listener[] = [];
+export class Listeners<T> {
+	private entries: Listener<T>[] = [];
 
-	add(callback: (value: float64) => void): () => void {
-		const listener = new Listener(callback);
+	add(callback: (value: T) => void): () => void {
+		const listener = new Listener<T>(callback);
 		this.entries.push(listener);
 		return (): void => {
 			listener.live = false;
 			this.entries = this.entries.filter(
-				(other: Listener): boolean => other !== listener,
+				(other: Listener<T>): boolean => other !== listener,
 			);
 		};
 	}
 
-	notify(value: float64): void {
+	notify(value: T): void {
 		for (const listener of this.entries.slice(0)) {
 			if (listener.live) { listener.callback(value); }
 		}
@@ -57,6 +59,15 @@ export interface InterpolationConfig {
 	extrapolateRight?: Extrapolate;
 }
 
+export interface ColorInterpolationConfig {
+	inputRange: float64[];
+	outputRange: MotionColor[];
+	easing?: EasingFunction;
+	extrapolate?: Extrapolate;
+	extrapolateLeft?: Extrapolate;
+	extrapolateRight?: Extrapolate;
+}
+
 function fail(message: string): never {
 	throw new Error("motion: " + message);
 }
@@ -64,7 +75,7 @@ function fail(message: string): never {
 export class DerivedValue {
 	private value: float64;
 	private compute: () => float64;
-	private listeners: Listeners = new Listeners();
+	private listeners: Listeners<float64> = new Listeners<float64>();
 	private unsubscribes: (() => void)[] = [];
 	private isDisposed: boolean = false;
 
@@ -101,6 +112,11 @@ export class DerivedValue {
 		return interpolated(this.source(), config);
 	}
 
+	interpolateColor(config: ColorInterpolationConfig): DerivedColor {
+		this.requireAlive();
+		return interpolatedColor(this.source(), config);
+	}
+
 	dispose(): void {
 		this.requireAlive();
 		this.isDisposed = true;
@@ -127,19 +143,20 @@ export class DerivedValue {
 	}
 }
 
-function checkInfiniteRange(name: string, range: float64[]): void {
-	if (range.length < 2) {
+function checkRangeLength(name: string, length: int32): void {
+	if (length < 2) {
 		fail(name + " must have at least 2 elements");
 	}
+}
+
+function checkInfiniteRange(name: string, range: float64[]): void {
+	checkRangeLength(name, range.length);
 	if (range.length === 2 && range[0] === -Infinity && range[1] === Infinity) {
 		fail(name + " cannot be ]-infinity;+infinity[");
 	}
 }
 
-function checkValidRanges(config: InterpolationConfig): void {
-	const input = config.inputRange;
-	const output = config.outputRange;
-	checkInfiniteRange("outputRange", output);
+function checkInputRange(input: float64[], outputLength: int32): void {
 	checkInfiniteRange("inputRange", input);
 	for (let i: int32 = 1; i < input.length; i += 1) {
 		if (!(input[i] >= input[i - 1])) {
@@ -149,15 +166,42 @@ function checkValidRanges(config: InterpolationConfig): void {
 			);
 		}
 	}
-	if (input.length !== output.length) {
+	if (input.length !== outputLength) {
 		fail(
 			"inputRange (" + input.length.toString() + ") and outputRange (" +
-				output.length.toString() + ") must have the same length",
+				outputLength.toString() + ") must have the same length",
 		);
 	}
-	for (const out of output) {
+}
+
+function checkValidRanges(config: InterpolationConfig): void {
+	checkInfiniteRange("outputRange", config.outputRange);
+	checkInputRange(config.inputRange, config.outputRange.length);
+	for (const out of config.outputRange) {
 		if (Number.isNaN(out)) { fail("outputRange must not hold NaN"); }
 	}
+}
+
+function finiteColor(color: MotionColor): boolean {
+	return Number.isFinite(color.r) && Number.isFinite(color.g) &&
+		Number.isFinite(color.b) && Number.isFinite(color.a);
+}
+
+function checkColorRanges(config: ColorInterpolationConfig): void {
+	checkRangeLength("outputRange", config.outputRange.length);
+	checkInputRange(config.inputRange, config.outputRange.length);
+	for (const out of config.outputRange) {
+		if (!finiteColor(out)) {
+			fail("outputRange must hold finite colour channels");
+		}
+	}
+}
+
+function side(
+	own: Extrapolate | null,
+	shared: Extrapolate | null,
+): Extrapolate {
+	return own ?? shared ?? Extrapolate.Extend;
 }
 
 function findRange(input: float64, inputRange: float64[]): int32 {
@@ -217,10 +261,8 @@ export function interpolated(
 	const inputRange = config.inputRange.slice(0);
 	const outputRange = config.outputRange.slice(0);
 	const easing = easingOr(config.easing, Easing.linear);
-	const left = config.extrapolateLeft ?? config.extrapolate ??
-		Extrapolate.Extend;
-	const right = config.extrapolateRight ?? config.extrapolate ??
-		Extrapolate.Extend;
+	const left = side(config.extrapolateLeft, config.extrapolate);
+	const right = side(config.extrapolateRight, config.extrapolate);
 	return new DerivedValue([input], (): float64 => {
 		const at = input.get();
 		const range = findRange(at, inputRange);
@@ -234,6 +276,98 @@ export function interpolated(
 			left,
 			right,
 		);
+	});
+}
+
+function sameColor(a: MotionColor, b: MotionColor): boolean {
+	return a.r === b.r && a.g === b.g && a.b === b.b && a.a === b.a;
+}
+
+export class DerivedColor {
+	private value: MotionColor;
+	private compute: () => MotionColor;
+	private listeners: Listeners<MotionColor> = new Listeners<MotionColor>();
+	private unsubscribes: (() => void)[] = [];
+	private isDisposed: boolean = false;
+
+	constructor(inputs: ValueSource[], compute: () => MotionColor) {
+		this.compute = compute;
+		this.value = compute();
+		for (const input of inputs) {
+			this.unsubscribes.push(
+				input.subscribe((changed: float64): void => { this.update(); }),
+			);
+		}
+	}
+
+	get(): MotionColor {
+		this.requireAlive();
+		return this.value;
+	}
+
+	subscribe(callback: (value: MotionColor) => void): () => void {
+		this.requireAlive();
+		return this.listeners.add(callback);
+	}
+
+	dispose(): void {
+		this.requireAlive();
+		this.isDisposed = true;
+		for (const unsubscribe of this.unsubscribes) {
+			unsubscribe();
+		}
+		this.unsubscribes = [];
+		this.listeners.clear();
+	}
+
+	private requireAlive(): void {
+		if (this.isDisposed) {
+			fail("a DerivedColor is used after dispose");
+		}
+	}
+
+	private update(): void {
+		const next = this.compute();
+		if (sameColor(next, this.value)) {
+			return;
+		}
+		this.value = next;
+		this.listeners.notify(next);
+	}
+}
+
+function asValue(color: MotionColor): MotionValue {
+	return colorValue(color.r, color.g, color.b, color.a);
+}
+
+export function interpolatedColor(
+	input: ValueSource,
+	config: ColorInterpolationConfig,
+): DerivedColor {
+	checkColorRanges(config);
+	const left = side(config.extrapolateLeft, config.extrapolate);
+	const right = side(config.extrapolateRight, config.extrapolate);
+	if (left === Extrapolate.Identity || right === Extrapolate.Identity) {
+		fail("a colour interpolation cannot extrapolate by identity");
+	}
+	const inputRange = config.inputRange.slice(0);
+	const outputRange = config.outputRange.map(asValue);
+	const easing = easingOr(config.easing, Easing.linear);
+	return new DerivedColor([input], (): MotionColor => {
+		const at = input.get();
+		const range = findRange(at, inputRange);
+		const progress = interpolateSegment(
+			at,
+			inputRange[range],
+			inputRange[range + 1],
+			0,
+			1,
+			easing,
+			left,
+			right,
+		);
+		return interpolate(outputRange[range], outputRange[range + 1], progress)
+			.color;
 	});
 }
 

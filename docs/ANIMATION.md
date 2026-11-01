@@ -132,6 +132,12 @@ Nothing traced so far needed a **NEW MECHANISM**: every part is a port of one of
   explicit `from`, because a document's keyframes are data the editor owns. Not ported: anime's
   absolute-timeline truncation (`render.js:197-205`), so seeking a replaced player backwards does
   not replay the part it wrote before the takeover.
+- **A colour output range mixes in Oklab.** React Native interpolates each RGBA channel of a
+  colour string (`AnimatedInterpolation.js:204-266`); Pulse's `interpolateColor` takes the same
+  segment, easing and extrapolation for a progress, then mixes `MotionColor`s through the
+  evaluator's Oklab `interpolate`, so a derived colour and a keyframed one agree. Identity
+  extrapolation is refused for colours, where the reference would write the input into every
+  channel, and strings with units (`"45deg"`) are not parsed: the consumer formats a number.
 - **`dispose` follows Flutter** (`animation_controller.dart:902-920`): it ends the running
   animation with `finished = false`, notifies no listener, and refuses every later call.
 
