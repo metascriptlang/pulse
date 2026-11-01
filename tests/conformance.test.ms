@@ -12,8 +12,10 @@ import {
 	runConformance,
 } from "../src/conformance";
 import { conformanceCases } from "../src/conformanceCases";
-import { MotionDocument } from "../src/document";
+import { ManualClock } from "../src/clock";
+import { MotionDocument, MotionValue } from "../src/document";
 import { headlessAdapter } from "../src/headless";
+import { MotionBinding, MotionPlayer, motionOptions } from "../src/player";
 import { MotionPolicy } from "../src/policy";
 import { Composition } from "../src/target";
 import { CONFORMANCE_GOLDEN } from "../src/conformanceGolden";
@@ -330,5 +332,142 @@ test "an adapter that counts its engine animations proves what it declared" {
 	for (const adapter of honest) {
 		const found = failures(runConformance(adapter, cases, CONFORMANCE_GOLDEN));
 		assert found.length === 0, found.join("\n");
+	}
+}
+
+class WebTiming {
+	delay: float64 = 0;
+	iterations: float64 = 1;
+	gap: float64 = 0;
+	alternate: boolean = false;
+	initial: float64 = 0;
+}
+
+function webTiming(configure: (timing: WebTiming) => void): WebTiming {
+	const timing = new WebTiming();
+	configure(timing);
+	return timing;
+}
+
+const RAMP_DURATION: float64 = 1000;
+const RAMP_SPAN: float64 = 100;
+
+function rampByWebAnimations(timing: WebTiming, local: float64): float64 {
+	if (local < timing.delay) {
+		return timing.initial;
+	}
+	const activeDuration = RAMP_DURATION * timing.iterations + timing.gap * (timing.iterations - 1);
+	const active = Math.min(local - timing.delay, activeDuration);
+	const cycle = RAMP_DURATION + timing.gap;
+	let iteration: float64 = timing.iterations - 1;
+	let progress: float64 = 1;
+	if (active < activeDuration) {
+		iteration = Math.floor(active / cycle);
+		progress = Math.min(active - iteration * cycle, RAMP_DURATION) / RAMP_DURATION;
+	}
+	const directed = timing.alternate && iteration % 2 === 1 ? 1 - progress : progress;
+	return RAMP_SPAN * directed;
+}
+
+class Rows {
+	checked: int32 = 0;
+	mismatches: string[] = [];
+
+	check(name: string, timing: WebTiming, local: (at: float64) => float64): void {
+		const rows = CONFORMANCE_GOLDEN.filter(
+			(trace: ConformanceTrace): boolean => trace.name === name,
+		)[0].checkpoints;
+		for (const row of rows) {
+			const want = rampByWebAnimations(timing, local(row.at));
+			if (!(Math.abs(row.values[0] - want) <= GOLDEN_PRECISION)) {
+				this.mismatches.push(
+					name + " at " + row.at.toString() + ": golden " + row.values[0].toString() +
+						", Web Animations " + want.toString(),
+				);
+			}
+			this.checked += 1;
+		}
+	}
+}
+
+test "the golden's time rows agree with the Web Animations timing model computed by hand" {
+	const clockTime = (at: float64): float64 => at;
+	const rows = new Rows();
+	rows.check("time.duration", new WebTiming(), clockTime);
+	rows.check(
+		"time.delay",
+		webTiming((t: WebTiming): void => { t.delay = 200; t.initial = 50; }),
+		clockTime,
+	);
+	rows.check(
+		"time.repeat",
+		webTiming((t: WebTiming): void => { t.iterations = 3; t.gap = 100; }),
+		clockTime,
+	);
+	rows.check(
+		"time.yoyo",
+		webTiming((t: WebTiming): void => { t.iterations = 2; t.alternate = true; }),
+		clockTime,
+	);
+	rows.check(
+		"time.rate",
+		new WebTiming(),
+		(at: float64): float64 => at <= 200 ? 2 * at : 400 + 0.5 * (at - 200),
+	);
+	rows.check(
+		"reverse",
+		new WebTiming(),
+		(at: float64): float64 => at <= 600 ? at : Math.max(0, 600 - (at - 600)),
+	);
+	assert rows.mismatches.length === 0, rows.mismatches.join("\n");
+	assert rows.checked >= 20, rows.checked.toString();
+}
+
+function seekedRamp(name: string, position: float64): float64 {
+	const spec = only(name)[0].players[0];
+	const clock = new ManualClock();
+	let shown: float64 = NaN;
+	const binding: MotionBinding = {
+		slot: "box",
+		property: "x",
+		write: (value: MotionValue): void => { shown = value.number; },
+		read: null,
+	};
+	const player = new MotionPlayer(spec.document, [binding], {
+		...motionOptions(clock.clock),
+		repeat: spec.timing.repeat,
+		repeatDelay: spec.timing.repeatDelay,
+		yoyo: spec.timing.yoyo,
+		paused: true,
+	});
+	player.seek(position);
+	return shown;
+}
+
+function probeMismatch(name: string, timing: WebTiming, at: float64): string {
+	const want = rampByWebAnimations(timing, at);
+	const got = seekedRamp(name, at);
+	if (Math.abs(got - want) <= GOLDEN_PRECISION) {
+		return "";
+	}
+	return name + " at " + at.toString() + ": player " + got.toString() + ", Web Animations " +
+		want.toString();
+}
+
+test "the player agrees with the Web Animations timing model an epsilon either side of each boundary" {
+	const epsilon: float64 = 1e-3;
+	const repeated = webTiming((t: WebTiming): void => { t.iterations = 3; t.gap = 100; });
+	const boundaries: float64[] = [1000, 1100, 2100, 2200, 3200];
+	for (const boundary of boundaries) {
+		const before = probeMismatch("time.repeat", repeated, boundary - epsilon);
+		assert before === "", before;
+		const after = probeMismatch("time.repeat", repeated, boundary + epsilon);
+		assert after === "", after;
+	}
+	const yoyo = webTiming((t: WebTiming): void => { t.iterations = 2; t.alternate = true; });
+	const probes: float64[] = [1000 - epsilon, 1000, 1000 + epsilon, 2000 - epsilon, 2000, 2000 + epsilon];
+	for (const at of probes) {
+		const mismatch = probeMismatch("time.yoyo", yoyo, at);
+		assert mismatch === "", mismatch;
 	}
 }
