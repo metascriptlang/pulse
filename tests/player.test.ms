@@ -215,6 +215,14 @@ test "repeat -1 never completes and keeps one frame pending" {
 	assert rig.clock.pending() === 1 && rig.events.count("complete") === 0;
 }
 
+test "repeat -1 is still running after GSAP's endless 1e10 seconds, counted in ms" {
+	const rig = new Rig((options: MotionOptions): MotionOptions => ({ ...options, repeat: -1 }));
+	assert rig.player.totalDuration === 1e13;
+	rig.player.seek(1e10 + 500, false);
+	assert near(rig.probe.last(), 50) && rig.events.count("complete") === 0;
+	assert rig.clock.pending() === 1;
+}
+
 test "reverse plays backwards from the current time and completes at zero" {
 	const rig = plain();
 	rig.clock.advance(600);

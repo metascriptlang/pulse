@@ -11,7 +11,7 @@ import {
 import { Composition, MotionTarget, TargetClaim } from "./target";
 
 const PLAYHEAD_EPSILON: float64 = 1e-8;
-const INFINITE_TOTAL_DURATION: float64 = 1e10;
+const INFINITE_TOTAL_DURATION: float64 = 1e13;
 
 export interface MotionBinding {
 	slot: string;
