@@ -14,7 +14,7 @@ import { MotionDocument } from "../src/document";
 import { headlessAdapter } from "../src/headless";
 import { MotionPolicy } from "../src/policy";
 import { Composition } from "../src/target";
-import { CONFORMANCE_GOLDEN } from "./conformanceGolden";
+import { CONFORMANCE_GOLDEN } from "../src/conformanceGolden";
 
 function failures(results: ConformanceResult[]): string[] {
 	const out: string[] = [];

@@ -221,7 +221,7 @@ timeline the editor scrubs must be reproducible, while a live gesture keeps its 
 The contract above is executable: `src/conformanceCases.ms` holds one case per item (players,
 values, a script of control calls at times, checkpoints that read presented values and events),
 `src/conformance.ms` the runner and the `ConformanceAdapter` an adapter implements, and
-`tests/conformanceGolden.ms` the expected trace, written by Pulse's headless binding
+`src/conformanceGolden.ms` the expected trace, written by Pulse's headless binding
 (`src/headless.ms`, a `ManualClock` stepped in 4 ms frames) through `msc run tests/writeGolden.ms`.
 A change to the engine's meaning shows as a diff of that file, reviewed like code. Every adapter
 (Neon's signals and WAAPI, Core Animation, DirectComposition, Void) runs

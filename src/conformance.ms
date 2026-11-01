@@ -428,7 +428,7 @@ function quoted(texts: string[]): string {
 
 export function goldenSource(traces: ConformanceTrace[]): string {
 	const lines: string[] = [
-		'import { ConformanceTrace } from "../src/conformance";',
+		'import { ConformanceTrace } from "./conformance";',
 		"",
 		"export const CONFORMANCE_GOLDEN: ConformanceTrace[] = [",
 	];

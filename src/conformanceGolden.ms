@@ -1,4 +1,4 @@
-import { ConformanceTrace } from "../src/conformance";
+import { ConformanceTrace } from "./conformance";
 
 export const CONFORMANCE_GOLDEN: ConformanceTrace[] = [
 	{
