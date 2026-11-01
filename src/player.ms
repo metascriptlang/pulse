@@ -312,6 +312,7 @@ export class MotionPlayer {
 
 	finish(): void {
 		this.live();
+		if (this.repeatCount < 0 && this.scale > 0) { fail("finish has no end on an endless repeat"); }
 		this.moveTo(this.scale < 0 ? 0 : this.totalDur, false);
 	}
 

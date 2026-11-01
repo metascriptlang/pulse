@@ -224,7 +224,9 @@ What an app relies on, the same on every backend:
   finite timeline is zero (§4.1); and a rate other than 1 or `reverse()`, because the scroll
   position sets the playhead and scroll-animations defines no playback rate over it;
 - **cancel and finish:** cancel holds the current value, finish goes to the directional endpoint
-  (the prototype's choice); restoring a baseline is a separate decision;
+  (the prototype's choice); restoring a baseline is a separate decision. Finish on an endless
+  repeat played forwards is refused with `motion: …`, as WAAPI's `finish()` throws
+  `InvalidStateError` on an infinite end;
 - **retarget:** starts from the current state, and a spring keeps its velocity;
 - **contention:** two writers of one property are replace, blend or an error, never an implicit
   "last write wins";

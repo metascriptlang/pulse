@@ -223,6 +223,18 @@ test "repeat -1 is still running after GSAP's endless 1e10 seconds, counted in m
 	assert rig.clock.pending() === 1;
 }
 
+test "finish refuses an endless repeat played forwards, and reaches zero played backwards" {
+	const rig = new Rig((options: MotionOptions): MotionOptions => ({ ...options, repeat: -1 }));
+	rig.clock.advance(1500);
+	const refused = refusal((): void => { rig.player.finish(); });
+	assert refused === "motion: finish has no end on an endless repeat", refused;
+	assert near(rig.probe.last(), 50) && rig.events.count("complete") === 0;
+	assert rig.clock.pending() === 1;
+	rig.player.reverse();
+	rig.player.finish();
+	assert rig.player.totalTime === 0 && rig.events.count("reverseComplete") === 1;
+}
+
 test "reverse plays backwards from the current time and completes at zero" {
 	const rig = plain();
 	rig.clock.advance(600);
