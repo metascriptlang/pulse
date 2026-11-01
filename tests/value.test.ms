@@ -81,6 +81,18 @@ test "a linear timing reaches each fraction of its duration" {
 	assert ends.finished === 1;
 }
 
+test "a timing ends on the frame its duration elapses, whatever fraction the clock started at" {
+	const clock = new ManualClock();
+	clock.advance(0.3);
+	clock.advance(500);
+	const value = new AnimatedValue(0, clock.clock, new MotionPolicy());
+	const ends = new Ends();
+	value.animate(linear(100, 500), ends.handler);
+	clock.advance(500);
+	assert value.get() === 100;
+	assert ends.finished === 1;
+}
+
 test "a timing defaults to 300 ms of Easing.inOut(Easing.quad)" {
 	const clock = new ManualClock();
 	const value = new AnimatedValue(0, clock.clock, new MotionPolicy());

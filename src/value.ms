@@ -9,7 +9,7 @@ import {
 	interpolatedColor,
 } from "./derived";
 import { Easing, EasingFunction, easingOr } from "./easing";
-import { Clock } from "./clock";
+import { Clock, PLAYHEAD_EPSILON } from "./clock";
 import {
 	DecayConfig,
 	DecaySimulation,
@@ -353,7 +353,7 @@ class Run {
 			this.startTime = now;
 			runtime = 0;
 		}
-		if (runtime >= this.spec.durationMs) {
+		if (runtime >= this.spec.durationMs - PLAYHEAD_EPSILON) {
 			this.current = this.to;
 			return true;
 		}
@@ -402,7 +402,7 @@ class Run {
 
 	frameDelay(now: float64): boolean {
 		const child = this.children[0];
-		if (now - this.startTime >= this.spec.durationMs || this.reduce) {
+		if (now - this.startTime >= this.spec.durationMs - PLAYHEAD_EPSILON || this.reduce) {
 			if (!this.begun) {
 				child.start(this.current, now, this.previous);
 				this.previous = null;

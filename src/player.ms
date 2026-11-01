@@ -1,4 +1,4 @@
-import { Clock } from "./clock";
+import { Clock, PLAYHEAD_EPSILON } from "./clock";
 import { ComposedTrack, flatten, localTime, writerAt } from "./compose";
 import { MotionDocument, MotionValue, findClip, validate } from "./document";
 import { sampleTrack } from "./evaluate";
@@ -10,7 +10,6 @@ import {
 } from "./scroll";
 import { Composition, MotionTarget, TargetClaim } from "./target";
 
-const PLAYHEAD_EPSILON: float64 = 1e-8;
 const INFINITE_TOTAL_DURATION: float64 = 1e13;
 
 export interface MotionBinding {

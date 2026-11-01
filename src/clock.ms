@@ -1,3 +1,5 @@
+export const PLAYHEAD_EPSILON: float64 = 1e-8;
+
 export interface Clock {
 	now: () => float64;
 	request: (callback: (time: float64) => void) => int32;
