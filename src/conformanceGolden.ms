@@ -261,6 +261,19 @@ export const CONFORMANCE_GOLDEN: ConformanceTrace[] = [
 		],
 	},
 	{
+		name: "derived.color",
+		error: "",
+		checkpoints: [
+			{ at: 0, values: [1, 0, 0, 1, 0.2, 0.3, 0.2], events: [] },
+			{ at: 250, values: [0.550441, 0.325621, 0.636501, 1, 0.248385, 0.348377, 0.224831], events: [] },
+			{ at: 500, values: [0, 0, 1, 1, 0.297854, 0.39788, 0.249767], events: [] },
+			{ at: 750, values: [0.453015, 0.63808, 1, 0.75, 0.348402, 0.448441, 0.27482], events: [] },
+			{ at: 1000, values: [1, 1, 1, 0.5, 0.4, 0.5, 0.3], events: ["a:finished"] },
+			{ at: 1250, values: [1, 1, 1, 0.5, 0.452611, 0.552504, 0.325315], events: [] },
+			{ at: 1500, values: [1, 1, 1, 0.5, 0.506194, 0.605906, 0.350769], events: ["a:finished"] },
+		],
+	},
+	{
 		name: "composite.parallel",
 		error: "",
 		checkpoints: [
