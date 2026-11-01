@@ -97,6 +97,7 @@ Sources: `~/projects/refs-animation/` (tarballs; `COMMITS` there): Theatre `6ea8
 | composites | Pulse `composite.ms` | React Native `AnimatedImplementation.js` `sequenceImpl` :305-361, `parallelImpl` :368-434, `delayImpl` :436-444, `staggerImpl` :446-455, `loopImpl` :463-517 |
 | 2D value | Pulse `valueXY.ms` | React Native `nodes/AnimatedValueXY.js:80-185`, `maybeVectorAnim` :106-126 |
 | event mapping | Pulse `event.ms` | React Native `AnimatedEvent.js:218-257` |
+| scroll time source | Pulse `scroll.ms`, `player.ms` | CSS Scroll-driven Animations 1 (editor's draft read 2026-11-01): progress §2.1, `ScrollTimeline` §2.2.2, named ranges §3.1, view progress §3.2, `ViewTimeline` §3.3.2, insets §3.4.3, finite timelines §4.1; delays as proportions, Web Animations 2 §2.3 |
 
 Nothing traced so far needed a **NEW MECHANISM**: every part is a port of one of these.
 
@@ -175,6 +176,16 @@ thread.
 | terminal | none | evaluator on the terminal's frame | |
 | SSR | static `@keyframes` | none | for motion in the first paint |
 
+A player's time can come from a scroll position instead of a clock (`MotionOptions.source`,
+Pulse `scroll.ms`). The host reports raw geometry through `ScrollSource` (offset, scroll range,
+scrollport size per axis) and, for a view timeline, `ViewSubject` (the subject's start and size in
+the scroller's content); Pulse computes the progress, so every platform shares one formula.
+
+| platform | scroll and view time sources |
+|---|---|
+| browser | handed to `ScrollTimeline` / `ViewTimeline` with the same axis, range and inset, so the browser drives the playhead from scroll; compositor eligibility follows the property rules of the row above (not traced in browser source for scroll timelines). The hand-over is a later Neon step; until it lands, `BrowserMotionPlayer` gives `source` to its master player only (Neon `waapi.ms:473`) while its WAAPI tracks run on time, so a scroll source there is not yet supported |
+| every other platform | the evaluator reads the host's offsets once per frame of the player's clock and seeks the playhead; no platform engine above takes a scroll position |
+
 A retarget samples position and velocity from the core's closed form, cancels what the platform is
 running and hands over the new motion, as motion's `NativeAnimationExtended.ts:119-145` does, so
 seek, cancel and contention keep one meaning. A property that changes layout (`width`, `left`)
@@ -199,6 +210,19 @@ What an app relies on, the same on every backend:
 
 - **time:** units, delay, duration, repeat, direction, rate;
 - **seek:** the value at a chosen time, and whether a scrub fires events;
+- **time source:** a clock (`Time`), a scroller's progress (`Scroll { axis }`, offset over
+  scroll range, scroll-animations §2.1), or a subject's progress through its scroller
+  (`View { axis, range, inset }` with `cover`, `contain`, `entry`, `exit` as §3.1 places their
+  0% and 100%, insets shrinking the visibility range as §3.4.3). Progress × (delay + total
+  duration) − delay is the playhead, because Web Animations 2 §2.3 turns delays into proportions
+  of the timeline; it moves through the seek path with events, so `start`, `complete` and
+  `reverseComplete` fire as for a scrub. An inactive timeline (no scroll range, or a view range of
+  zero length: §2.2.2, §3.2, §3.3.2) holds the last value. Progress is clamped to 0..1, so the
+  endpoints hold outside the range as a time player holds after its end (CSS's default
+  `animation-fill-mode: none` would drop the effect there; the browser hand-over passes
+  `fill: both`). Refused at construction with `motion: …`: an endless repeat, whose duration on a
+  finite timeline is zero (§4.1); and a rate other than 1 or `reverse()`, because the scroll
+  position sets the playhead and scroll-animations defines no playback rate over it;
 - **cancel and finish:** cancel holds the current value, finish goes to the directional endpoint
   (the prototype's choice); restoring a baseline is a separate decision;
 - **retarget:** starts from the current state, and a spring keeps its velocity;
@@ -250,6 +274,13 @@ because a callback starts the next animation of a composite sequence or `loop`, 
 shifts everything after it by a frame per link, which no fixed tolerance bounds. An adapter
 fires callbacks from the app-thread clock at the end time the core computes, not from the
 engine's completion notice.
+
+Scroll is driven through the adapter's optional `scroll` (`ConformanceScroll`: `place` the
+scroller and subject geometry, `scrollTo` an offset); a case with `scroll` geometry
+(`scroll.progress`, `scroll.delay`, `scroll.reverseEvents`, `scroll.inactive`, `view.cover`,
+`view.entry`) reads after the next frame. An adapter without `scroll` has those cases counted
+`Refused`, whatever its `support` answers, and building them throws `motion: conformance: …`, so
+an adapter written before scroll sources keeps passing.
 
 ## Milestones
 
