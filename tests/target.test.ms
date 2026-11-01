@@ -173,6 +173,31 @@ test "blend sums two numeric players and settles on the newer end" {
 	assert sink.target.writers === 0;
 }
 
+test "a blended player played in reverse claims against the end it plays towards" {
+	const clock = new ManualClock();
+	const sink = new Sink();
+	const older = player(clock, [ramp("x", 0, 100)], [sink.binding("a")], Composition.Blend);
+	clock.advance(1000);
+	assert near(sink.last().value, 100) && sink.target.writers === 0;
+	older.reverse();
+	clock.advance(500);
+	assert near(sink.last().value, 50);
+	player(clock, [ramp("x", 0, 10)], [sink.binding("b")], Composition.Blend);
+	let previous = sink.last().value;
+	let jump: float64 = 0;
+	for (let frame: int32 = 1; frame <= 10; frame += 1) {
+		clock.advance(100);
+		jump = Math.max(jump, Math.abs(sink.last().value - previous));
+		previous = sink.last().value;
+		if (frame === 5) {
+			assert near(sink.last().value, 10.0 - 50.0 / 9.0), sink.last().value.toString();
+			assert sink.target.writers === 1;
+		}
+	}
+	assert jump <= 10 + 1e-6, jump.toString();
+	assert near(sink.last().value, 10) && sink.target.writers === 0;
+}
+
 test "blend of two animated values follows the additive model" {
 	const clock = new ManualClock();
 	const target = new MotionTarget();

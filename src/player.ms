@@ -558,7 +558,7 @@ export class MotionPlayer {
 
 	private endValue(target: ActiveTarget): MotionValue {
 		const reflected = this.yoyoing && this.repeatCount > 0 && this.repeatCount % 2 === 1;
-		const time = reflected ? 0 : this.iterationDuration;
+		const time = reflected || this.scale < 0 ? 0 : this.iterationDuration;
 		const reached = target.writers.map((): boolean => true);
 		const writer = target.writers[writerAt(target.writers, reached, time)];
 		return sampleTrack(writer.track, writer.localTime(time));
