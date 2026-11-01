@@ -216,6 +216,25 @@ What an app relies on, the same on every backend:
 Seeking a keyframe clip and seeking a simulation with interaction history are not the same. A
 timeline the editor scrubs must be reproducible, while a live gesture keeps its own state.
 
+### The conformance suite every adapter passes
+
+The contract above is executable: `src/conformanceCases.ms` holds one case per item (players,
+values, a script of control calls at times, checkpoints that read presented values and events),
+`src/conformance.ms` the runner and the `ConformanceAdapter` an adapter implements, and
+`tests/conformanceGolden.ms` the expected trace, written by Pulse's headless binding
+(`src/headless.ms`, a `ManualClock` stepped in 4 ms frames) through `msc run tests/writeGolden.ms`.
+A change to the engine's meaning shows as a diff of that file, reviewed like code. Every adapter
+(Neon's signals and WAAPI, Core Animation, DirectComposition, Void) runs
+`runConformance(adapter, conformanceCases(), CONFORMANCE_GOLDEN)` in its own tests; a case passes
+within its tolerance (0.01 for keyframes and timing, 0.5 where a platform samples a spring), with
+the same events at the same checkpoint.
+
+An adapter answers each case with `support`: `Engine` (handed to the platform engine), `Evaluator`
+(run by Pulse on the app's thread) or `Refused`. Engine and Evaluator are held to the same golden;
+a platform may only move a case between them, as WAAPI runs `decay` and a blending player on the
+evaluator. `Refused` passes only when building the case throws `motion: …`, the rule of criterion 7
+for a track a backend cannot run; a case that runs with another meaning fails, whatever it declared.
+
 ## Milestones
 
 | | what | proof |
