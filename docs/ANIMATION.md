@@ -3,7 +3,7 @@
 State: design agreed on 2026-10-11, prototyped on 2026-10-12, built in Neon's `src/motion/` from
 2026-10-29, and moved with its history into this repo, Pulse, on 2026-11-01 (entry `src/index.ms`,
 tests `tests/`). The adapters live with their consumers: Neon's `src/motion/neon.ms` and `waapi.ms`,
-and the Void adapter `void.ms`, in Neon until Void takes it. The older animation code is separate:
+and Void's `src/motion/bindings.ms` and `clock.ms` (moved from Neon on 2026-11-01, Void `2e9bf349`). The older animation code is separate:
 Neon's `src/animation/` is React Native's `Animated` surface on Neon signals, and Neon's
 `src/components/scene2d.ms` (`Anim`) and `src/components/scene3d/animation.ms` (`ObjectAnimation`,
 `MeshFrameAnimation`) play Void's own frame data. The person decided on 2026-10-31 that this engine
@@ -141,7 +141,7 @@ Nothing traced so far needed a **NEW MECHANISM**: every part is a port of one of
 |---|---|---|---|
 | browser renderer, JS | the browser's animation clock or rAF | WAAPI when expressible, evaluator otherwise | DOM style |
 | Void in the browser, WASM | `VoidClock`, ticked from Void's loop | evaluator | Void scene properties, no CSS. `examples/motionVoid/headless.ms` built with `--os=emcc -d:webgl2` (emsdk loaded) prints the same frames under node as natively (2026-10-29, yoga `6a1cc06`) |
-| Void native, standalone | `void.ms` `VoidClock`, ticked by the program's frame closure beside `Scene2D.tick(dt)` | evaluator | `VoidBindings`: 2D node and 3D object properties, no Neon |
+| Void native, standalone | Void `src/motion/clock.ms` `VoidClock`, ticked by the program's frame closure beside `Scene2D.tick(dt)` | evaluator | `VoidBindings`: 2D node and 3D object properties, no Neon |
 | Neon on Void | the Void area clock (`src/render/voidClock.ms`) | evaluator, no second scheduler | Neon → scene |
 | Neon native hosts | the host's display frame (`src/animation/frame.ms`) | evaluator | native view properties |
 | tests, headless | manual clock | evaluator | values or mock bindings |
@@ -246,7 +246,7 @@ for a track a backend cannot run; a case that runs with another meaning fails, w
 | E | interactive motion: spring, gesture, retarget, Neon reactivity | interrupts, disposal and ownership right |
 | F | editor proof in Lightcube: edit, save, reopen | round-trip loses no structure; playback uses the same document |
 | G | a Neon app in the browser plays through WAAPI: `useMotion` and `useAnimatedValue` bind DOM elements, merged keyframes per CSS property, stagger as `delay`, spring as `linear()` (Pulse `progress.ms` `sampleSpring` and `cssLinear`), no JS master tick when every track is handed over; fix found on 2026-10-31: `commitStyles` swallows its error (`waapi.ms:362`) | Chrome shows no per-frame style write from JS for a handed-over track |
-| H | Void bindings become data (node, property); a rotation binding writes a quaternion, not one Euler axis read back through `eulerOf` (`void.ms:164-168`); `void.ms` moves into Void, importing Pulse, while `neon.ms` and `waapi.ms` stay in Neon with closure bindings | Void standalone imports Pulse without Neon |
+| H | done 2026-11-01 (Void `2e9bf349`): Void bindings are data (node or object, property enum) in Void `src/motion/bindings.ms`; the three rotation axes of an object share one quaternion write; Void imports Pulse through `build.ms` deps; the conformance suite passes on Void's evaluator, native and WASM | Void standalone imports Pulse without Neon |
 | I | one system for UI motion: derived values (interpolate, arithmetic, `diffClamp`), gesture and scroll events, 2D values, `parallel` and `loop`; `Presence` and `LayoutAnimation` (native and browser) rebuilt on the core; every consumer of `src/animation/` moved (navigation, drawer, header, collapsible, pageView, examples, tests), then `src/animation/` deleted except `frame.ms`; Void's sprite `Anim` clock and `ObjectAnimation`/`MeshFrameAnimation` clocks replaced by the core, which drives Void's glTF and mesh-frame samplers by time and weight | every former consumer runs on the core; a skinned glTF driven by the core matches today's `Clip` crossfade; cost per joint measured against `syncPose` |
 | J | platform engines: Core Animation on macOS and iOS, DirectComposition on Windows, for `transform` and `opacity` | motion stays smooth while the app thread is blocked on purpose |
 | later | Rive-style state machine, interchange | only when a workflow needs it |
