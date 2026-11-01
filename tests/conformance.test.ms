@@ -285,3 +285,50 @@ test "an adapter that cannot drive scroll has the scroll cases refused" {
 		assert result.support === ConformanceSupport.Refused, result.name;
 	}
 }
+
+function engineCounting(
+	base: ConformanceAdapter,
+	declared: ConformanceSupport,
+	live: int32,
+): ConformanceAdapter {
+	return {
+		name: "counting",
+		support: (testCase: ConformanceCase): ConformanceSupport => declared,
+		begin: base.begin,
+		player: base.player,
+		value: base.value,
+		clock: base.clock,
+		advanceTo: base.advanceTo,
+		read: base.read,
+		end: base.end,
+		engineAnimations: (): int32 => live,
+	};
+}
+
+test "an adapter that counts its engine animations proves what it declared" {
+	const cases = only("time.duration");
+	const idle = failures(runConformance(
+		engineCounting(headlessAdapter(), ConformanceSupport.Engine, 0),
+		cases,
+		CONFORMANCE_GOLDEN,
+	));
+	assert idle.length === 1 && idle[0] ===
+		"time.duration: declared Engine, but no platform-engine animation was live at a checkpoint",
+		idle.join("\n");
+	const busy = failures(runConformance(
+		engineCounting(headlessAdapter(), ConformanceSupport.Evaluator, 2),
+		cases,
+		CONFORMANCE_GOLDEN,
+	));
+	assert busy.length === 1 && busy[0] ===
+		"time.duration at 0: declared Evaluator, but 2 platform-engine animations were live",
+		busy.join("\n");
+	const honest = [
+		engineCounting(headlessAdapter(), ConformanceSupport.Engine, 1),
+		engineCounting(headlessAdapter(), ConformanceSupport.Evaluator, 0),
+	];
+	for (const adapter of honest) {
+		const found = failures(runConformance(adapter, cases, CONFORMANCE_GOLDEN));
+		assert found.length === 0, found.join("\n");
+	}
+}

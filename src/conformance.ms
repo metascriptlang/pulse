@@ -115,6 +115,7 @@ export interface ConformanceAdapter {
 	read: (property: string) => float64;
 	end: () => void;
 	scroll?: ConformanceScroll;
+	engineAnimations?: () => int32;
 }
 
 export struct ConformanceStep {
@@ -315,6 +316,7 @@ function requireSorted(times: float64[], what: string, name: string): void {
 function play(
 	adapter: ConformanceAdapter,
 	testCase: ConformanceCase,
+	engine: int32[],
 ): ConformanceCheckpoint[] {
 	const stepTimes = testCase.steps.map(
 		(step: ConformanceStep): float64 => step.at,
@@ -334,6 +336,10 @@ function play(
 			continue;
 		}
 		adapter.advanceTo(at);
+		const live = adapter.engineAnimations;
+		if (live !== null) {
+			engine.push(live());
+		}
 		out.push({
 			at,
 			values: testCase.reads.map((name: string): float64 => scene.read(name)),
@@ -351,10 +357,18 @@ export function observe(
 	adapter: ConformanceAdapter,
 	testCase: ConformanceCase,
 ): ConformanceTrace {
+	return observeEngine(adapter, testCase, []);
+}
+
+function observeEngine(
+	adapter: ConformanceAdapter,
+	testCase: ConformanceCase,
+	engine: int32[],
+): ConformanceTrace {
 	let checkpoints: ConformanceCheckpoint[] = [];
 	let error = "";
 	try {
-		checkpoints = play(adapter, testCase);
+		checkpoints = play(adapter, testCase, engine);
 	} catch (e) {
 		error = e.message;
 	}
@@ -427,6 +441,45 @@ export function compare(
 	return compareCheckpoints(testCase, golden, observed, tolerance);
 }
 
+function engineFailures(
+	testCase: ConformanceCase,
+	support: ConformanceSupport,
+	observed: ConformanceTrace,
+	engine: int32[],
+): string[] {
+	if (engine.length === 0 || observed.error !== "") {
+		return [];
+	}
+	if (support === ConformanceSupport.Engine) {
+		if (engine.some((live: int32): boolean => live > 0)) {
+			return [];
+		}
+		return [
+			testCase.name +
+				": declared Engine, but no platform-engine animation was live at a checkpoint",
+		];
+	}
+	if (support !== ConformanceSupport.Evaluator) {
+		return [];
+	}
+	for (let i: int32 = 0; i < engine.length; i += 1) {
+		const live = engine[i];
+		if (live > 0) {
+			const counted = live === 1
+				? "1 platform-engine animation was live"
+				: live.toString() + " platform-engine animations were live";
+			return [
+				testCase.name +
+					" at " +
+					observed.checkpoints[i].at.toString() +
+					": declared Evaluator, but " +
+					counted,
+			];
+		}
+	}
+	return [];
+}
+
 function goldenFor(
 	golden: ConformanceTrace[],
 	name: string,
@@ -459,14 +512,15 @@ export function runConformance(
 			});
 			continue;
 		}
-		const observed = observe(adapter, testCase);
+		const engine: int32[] = [];
+		const observed = observeEngine(adapter, testCase, engine);
 		const failures = compare(
 			testCase,
 			support,
 			expected,
 			observed,
 			tolerance ?? testCase.tolerance,
-		);
+		).concat(engineFailures(testCase, support, observed, engine));
 		results.push({ name: testCase.name, support, failures });
 	}
 	return results;

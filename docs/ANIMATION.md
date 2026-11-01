@@ -266,6 +266,9 @@ An adapter answers each case with `support`: `Engine` (handed to the platform en
 a platform may only move a case between them, as WAAPI runs `decay` and a blending player on the
 evaluator. `Refused` passes only when building the case throws `motion: …`, the rule of criterion 7
 for a track a backend cannot run; a case that runs with another meaning fails, whatever it declared.
+An adapter that can count the platform-engine animations it holds sets the optional
+`engineAnimations`, read at every checkpoint: an `Engine` case where none was live, or an
+`Evaluator` case where one was, fails.
 
 Colour is held to Oklab. `derived.color` reads a derived colour (`interpolateColor`) whose
 midpoints lie far outside the tolerance of an sRGB mix, so an engine that interpolates colour in
