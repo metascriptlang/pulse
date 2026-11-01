@@ -144,6 +144,12 @@ test "every contract item of docs/ANIMATION.md has a case" {
 		"composite.loop",
 		"valueXY",
 		"event",
+		"scroll.progress",
+		"scroll.delay",
+		"scroll.reverseEvents",
+		"scroll.inactive",
+		"view.cover",
+		"view.entry",
 	];
 	for (const item of items) {
 		assert names.includes(item), item;
@@ -262,4 +268,20 @@ test "an adapter that refuses a case it declared supported fails" {
 	);
 	assert found.length === 1 &&
 		found[0].startsWith("decay: threw motion: refusing"), found.join("\n");
+}
+
+test "an adapter that cannot drive scroll has the scroll cases refused" {
+	const scrolling = conformanceCases().filter(
+		(testCase: ConformanceCase): boolean => testCase.scroll !== null,
+	);
+	assert scrolling.length === 6;
+	const results = runConformance(
+		drifting(headlessAdapter(), 0),
+		scrolling,
+		CONFORMANCE_GOLDEN,
+	);
+	assert failures(results).length === 0, failures(results).join("\n");
+	for (const result of results) {
+		assert result.support === ConformanceSupport.Refused, result.name;
+	}
 }

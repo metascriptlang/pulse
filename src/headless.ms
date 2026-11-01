@@ -5,13 +5,25 @@ import {
 	ConformanceCase,
 	ConformancePlayer,
 	ConformanceProperty,
+	ConformanceScrollGeometry,
 	ConformanceSupport,
+	ConformanceTimeline,
 	ConformanceTiming,
 	ConformanceValue,
 } from "./conformance";
 import { MotionDocument, MotionValue, numberValue } from "./document";
 import { MotionBinding, MotionPlayer, motionOptions } from "./player";
 import { MotionPolicy } from "./policy";
+import {
+	ScrollAxis,
+	ScrollSource,
+	TimeSource,
+	TimeSourceKind,
+	ViewSubject,
+	scrollSource,
+	timeSource,
+	viewSource,
+} from "./scroll";
 import { Composition, MotionTarget } from "./target";
 import { AnimatedValue, AnimationSpec } from "./value";
 
@@ -27,6 +39,13 @@ class Stage {
 	names: string[] = [];
 	shown: float64[] = [];
 	targets: MotionTarget[] = [];
+	geometry: ConformanceScrollGeometry = {
+		viewport: 0,
+		max: 0,
+		subjectStart: 0,
+		subjectSize: 0,
+	};
+	offset: float64 = 0;
 
 	constructor(properties: ConformanceProperty[], policy: MotionPolicy) {
 		this.policy = policy;
@@ -66,6 +85,41 @@ class Stage {
 		};
 	}
 
+	place(geometry: ConformanceScrollGeometry): void {
+		this.geometry = geometry;
+		this.scrollTo(this.offset);
+	}
+
+	scrollTo(offset: float64): void {
+		this.offset = Math.min(Math.max(offset, 0), this.geometry.max);
+	}
+
+	source(timeline: ConformanceTimeline | null): TimeSource {
+		if (timeline === null) {
+			return timeSource();
+		}
+		const scroller: ScrollSource = {
+			offset: (axis: ScrollAxis): float64 => this.offset,
+			max: (axis: ScrollAxis): float64 => this.geometry.max,
+			viewport: (axis: ScrollAxis): float64 => this.geometry.viewport,
+		};
+		const subject: ViewSubject = {
+			start: (axis: ScrollAxis): float64 => this.geometry.subjectStart,
+			size: (axis: ScrollAxis): float64 => this.geometry.subjectSize,
+		};
+		return match (timeline.kind) {
+			TimeSourceKind.Time => timeSource(),
+			TimeSourceKind.Scroll => scrollSource(scroller, timeline.axis),
+			TimeSourceKind.View => viewSource(
+				scroller,
+				subject,
+				timeline.range,
+				timeline.inset,
+				timeline.axis,
+			),
+		};
+	}
+
 	player(
 		document: MotionDocument,
 		timing: ConformanceTiming,
@@ -89,6 +143,7 @@ class Stage {
 			yoyo: timing.yoyo,
 			timeScale: timing.timeScale,
 			paused: timing.paused,
+			source: this.source(timing.timeline),
 			composition: timing.composition,
 		});
 		player.onStart = (): void => {
@@ -207,6 +262,14 @@ class Headless {
 				this.stage.shown[this.stage.index(property)],
 			end: (): void => {
 				this.stage = new Stage([], new MotionPolicy());
+			},
+			scroll: {
+				place: (geometry: ConformanceScrollGeometry): void => {
+					this.stage.place(geometry);
+				},
+				scrollTo: (offset: float64): void => {
+					this.stage.scrollTo(offset);
+				},
 			},
 		};
 	}

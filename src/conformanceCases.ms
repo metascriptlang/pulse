@@ -3,6 +3,7 @@ import {
 	ConformancePlayerSpec,
 	ConformanceProperty,
 	ConformanceScene,
+	ConformanceScrollGeometry,
 	ConformanceStep,
 	ConformanceTiming,
 	ConformanceValueSpec,
@@ -26,6 +27,7 @@ import {
 import { EventPayload, event } from "./event";
 import { Easing } from "./easing";
 import { ReduceMotion } from "./policy";
+import { ScrollAxis, TimeSourceKind, ViewInset, ViewRange } from "./scroll";
 import { springByDuration, springByStiffness } from "./spring";
 import { Composition } from "./target";
 import {
@@ -105,6 +107,7 @@ function blank(name: string): ConformanceCase {
 		players: [],
 		values: [],
 		reducedMotion: false,
+		scroll: null,
 		steps: [],
 		checkpoints: [],
 		reads: ["box.x"],
@@ -595,6 +598,84 @@ function compositeCases(): ConformanceCase[] {
 	];
 }
 
+const SCROLLER: ConformanceScrollGeometry = {
+	viewport: 100,
+	max: 1000,
+	subjectStart: 500,
+	subjectSize: 50,
+};
+
+function scrolled(
+	kind: TimeSourceKind,
+	range: ViewRange = ViewRange.Cover,
+	inset: ViewInset = { start: 0, end: 0 },
+): ConformanceTiming {
+	return {
+		...conformanceTiming(),
+		timeline: { kind, axis: ScrollAxis.Block, range, inset },
+	};
+}
+
+function scrollCase(
+	name: string,
+	timing: ConformanceTiming,
+	offsets: float64[],
+): ConformanceCase {
+	const steps: ConformanceStep[] = [];
+	const checkpoints: float64[] = [20];
+	for (let i: int32 = 0; i < offsets.length; i += 1) {
+		const offset = offsets[i];
+		const time = (40 * (i + 1)) as float64;
+		steps.push(
+			at(time, (s: ConformanceScene): void => {
+				s.scrollTo(offset);
+			}),
+		);
+		checkpoints.push(time + 20);
+	}
+	return {
+		...rampCase(name, timing, steps, checkpoints),
+		scroll: SCROLLER,
+	};
+}
+
+function scrollCases(): ConformanceCase[] {
+	const scroll = scrolled(TimeSourceKind.Scroll);
+	return [
+		scrollCase("scroll.progress", scroll, [250, 1000]),
+		{
+			...scrollCase("scroll.delay", { ...scroll, delay: 250 }, [100, 600]),
+			properties: [property("box.x", 7)],
+		},
+		scrollCase("scroll.reverseEvents", scroll, [500, 0, 500, 1000, 600, 0]),
+		{
+			...scrollCase("scroll.inactive", scroll, [400]),
+			steps: [
+				at(40, (s: ConformanceScene): void => {
+					s.scrollTo(400);
+				}),
+				at(80, (s: ConformanceScene): void => {
+					s.place({ ...SCROLLER, max: 0 });
+				}),
+				at(120, (s: ConformanceScene): void => {
+					s.place(SCROLLER);
+				}),
+			],
+			checkpoints: [20, 60, 100, 140],
+		},
+		scrollCase(
+			"view.cover",
+			scrolled(TimeSourceKind.View),
+			[300, 475, 550, 400],
+		),
+		scrollCase(
+			"view.entry",
+			scrolled(TimeSourceKind.View, ViewRange.Entry, { start: 10, end: 20 }),
+			[445, 470],
+		),
+	];
+}
+
 function valueXYCases(): ConformanceCase[] {
 	const xy = [property("box.x"), property("box.y")];
 	return [
@@ -664,5 +745,6 @@ export function conformanceCases(): ConformanceCase[] {
 		colorCase(),
 		...compositeCases(),
 		...valueXYCases(),
+		...scrollCases(),
 	];
 }

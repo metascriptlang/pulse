@@ -332,4 +332,65 @@ export const CONFORMANCE_GOLDEN: ConformanceTrace[] = [
 			{ at: 600, values: [10, 20], events: [] },
 		],
 	},
+	{
+		name: "scroll.progress",
+		error: "",
+		checkpoints: [
+			{ at: 20, values: [0], events: [] },
+			{ at: 60, values: [25], events: ["p:start"] },
+			{ at: 100, values: [100], events: ["p:complete"] },
+		],
+	},
+	{
+		name: "scroll.delay",
+		error: "",
+		checkpoints: [
+			{ at: 20, values: [7], events: [] },
+			{ at: 60, values: [7], events: [] },
+			{ at: 100, values: [50], events: ["p:start"] },
+		],
+	},
+	{
+		name: "scroll.reverseEvents",
+		error: "",
+		checkpoints: [
+			{ at: 20, values: [0], events: [] },
+			{ at: 60, values: [50], events: ["p:start"] },
+			{ at: 100, values: [0], events: ["p:reverseComplete"] },
+			{ at: 140, values: [50], events: ["p:start"] },
+			{ at: 180, values: [100], events: ["p:complete"] },
+			{ at: 220, values: [60], events: [] },
+			{ at: 260, values: [0], events: ["p:reverseComplete"] },
+		],
+	},
+	{
+		name: "scroll.inactive",
+		error: "",
+		checkpoints: [
+			{ at: 20, values: [0], events: [] },
+			{ at: 60, values: [40], events: ["p:start"] },
+			{ at: 100, values: [40], events: [] },
+			{ at: 140, values: [0], events: ["p:reverseComplete"] },
+		],
+	},
+	{
+		name: "view.cover",
+		error: "",
+		checkpoints: [
+			{ at: 20, values: [0], events: [] },
+			{ at: 60, values: [0], events: [] },
+			{ at: 100, values: [50], events: ["p:start"] },
+			{ at: 140, values: [100], events: ["p:complete"] },
+			{ at: 180, values: [0], events: ["p:reverseComplete"] },
+		],
+	},
+	{
+		name: "view.entry",
+		error: "",
+		checkpoints: [
+			{ at: 20, values: [0], events: [] },
+			{ at: 60, values: [50], events: ["p:start"] },
+			{ at: 100, values: [100], events: ["p:complete"] },
+		],
+	},
 ];

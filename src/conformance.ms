@@ -4,6 +4,7 @@ import { DerivedColor, DerivedValue, ValueSource } from "./derived";
 import { MotionDocument } from "./document";
 import { WritableValue } from "./event";
 import { MotionPolicy } from "./policy";
+import { ScrollAxis, TimeSourceKind, ViewInset, ViewRange } from "./scroll";
 import { Composition } from "./target";
 import { AnimationSpec } from "./value";
 
@@ -28,6 +29,26 @@ export struct ConformanceTiming {
 	timeScale: float64;
 	paused: boolean;
 	composition: Composition;
+	timeline: ConformanceTimeline | null;
+}
+
+export struct ConformanceTimeline {
+	kind: TimeSourceKind;
+	axis: ScrollAxis;
+	range: ViewRange;
+	inset: ViewInset;
+}
+
+export struct ConformanceScrollGeometry {
+	viewport: float64;
+	max: float64;
+	subjectStart: float64;
+	subjectSize: float64;
+}
+
+export interface ConformanceScroll {
+	place: (geometry: ConformanceScrollGeometry) => void;
+	scrollTo: (offset: float64) => void;
 }
 
 export function conformanceTiming(): ConformanceTiming {
@@ -39,6 +60,7 @@ export function conformanceTiming(): ConformanceTiming {
 		timeScale: 1,
 		paused: false,
 		composition: Composition.Replace,
+		timeline: null,
 	};
 }
 
@@ -92,6 +114,7 @@ export interface ConformanceAdapter {
 	advanceTo: (time: float64) => void;
 	read: (property: string) => float64;
 	end: () => void;
+	scroll?: ConformanceScroll;
 }
 
 export struct ConformanceStep {
@@ -105,6 +128,7 @@ export struct ConformanceCase {
 	players: ConformancePlayerSpec[];
 	values: ConformanceValueSpec[];
 	reducedMotion: boolean;
+	scroll: ConformanceScrollGeometry | null;
 	steps: ConformanceStep[];
 	checkpoints: float64[];
 	reads: string[];
@@ -152,6 +176,10 @@ export class ConformanceScene {
 		this.adapter = adapter;
 		this.policy = new MotionPolicy(testCase.reducedMotion);
 		adapter.begin(testCase.properties, this.policy);
+		const geometry = testCase.scroll;
+		if (geometry !== null) {
+			this.place(geometry);
+		}
 		for (const spec of testCase.players) {
 			const name = spec.name;
 			this.playerNames.push(name);
@@ -165,6 +193,22 @@ export class ConformanceScene {
 			this.valueNames.push(spec.name);
 			this.values.push(adapter.value(spec.property, spec.composition));
 		}
+	}
+
+	private scroller(): ConformanceScroll {
+		const scroll = this.adapter.scroll;
+		if (scroll === null) {
+			fail("adapter " + this.adapter.name + " cannot drive scroll");
+		}
+		return scroll;
+	}
+
+	place(geometry: ConformanceScrollGeometry): void {
+		this.scroller().place(geometry);
+	}
+
+	scrollTo(offset: float64): void {
+		this.scroller().scrollTo(offset);
 	}
 
 	player(name: string): ConformancePlayer {
@@ -403,7 +447,9 @@ export function runConformance(
 ): ConformanceResult[] {
 	const results: ConformanceResult[] = [];
 	for (const testCase of cases) {
-		const support = adapter.support(testCase);
+		const support = testCase.scroll !== null && adapter.scroll === null
+			? ConformanceSupport.Refused
+			: adapter.support(testCase);
 		const expected = goldenFor(golden, testCase.name);
 		if (expected === null) {
 			results.push({
