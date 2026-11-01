@@ -8,6 +8,7 @@ Workspace rules (toolchain, compiler boundary, arcs and cards, code style) are i
 |---|---|
 | what the engine has to be, its references, departures, milestones, decisions | `docs/ANIMATION.md` |
 | the code | `src/index.ms` exports the engine; `tests/` holds one file per module |
+| the contract every adapter passes | `src/conformance.ms` (runner), `src/conformanceCases.ms`, `src/conformanceGolden.ms` (written by `msc run tests/writeGolden.ms`), `src/headless.ms` (the reference adapter) |
 
 ## Rules
 
