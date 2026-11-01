@@ -195,14 +195,20 @@ export function createDecay(
 		simulation.endSeconds = Math.max(thresholdSeconds, springStart);
 		return simulation;
 	}
-	let high = peakSeconds + 1;
-	while (Math.abs(simulation.rubberOffsetAt(high)) > RUBBER_BAND_SETTLE_DISTANCE) {
-		high = peakSeconds + (high - peakSeconds) * 2;
+	const outward = simulation.rubberOffset !== 0
+		? Math.sign(simulation.rubberOffset)
+		: Math.sign(velocityPerSecond);
+	const farthest = outward * simulation.rubberOffsetAt(peakSeconds) > outward * simulation.rubberOffset
+		? peakSeconds
+		: springStart;
+	let high = farthest + 1;
+	while (outward * simulation.rubberOffsetAt(high) > RUBBER_BAND_SETTLE_DISTANCE) {
+		high = farthest + (high - farthest) * 2;
 	}
-	let low = peakSeconds;
+	let low = farthest;
 	for (let step: int32 = 0; step < PEAK_REFINE_STEPS; step++) {
 		const middle = (low + high) / 2;
-		if (Math.abs(simulation.rubberOffsetAt(middle)) > RUBBER_BAND_SETTLE_DISTANCE) {
+		if (outward * simulation.rubberOffsetAt(middle) > RUBBER_BAND_SETTLE_DISTANCE) {
 			low = middle;
 		} else {
 			high = middle;

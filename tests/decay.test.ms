@@ -115,6 +115,18 @@ test "a rubber band starting outside the clamp is pulled to the nearest bound" {
 	assert decay.position(60000) === 100;
 }
 
+test "a rubber band starting outside and flung inward ends at the bound it crosses" {
+	const config: DecayConfig = { ...decayConfig(), clampMin: 0, clampMax: 100, rubberBand: true };
+	const decay = createDecay(config, 150, -1000);
+	let lowest = decay.position(0);
+	for (let ms: int32 = 0; ms <= 60000; ms += 1) {
+		lowest = Math.min(lowest, decay.position(ms as float64));
+	}
+	assert lowest === 100, lowest.toString();
+	assert decay.position(20) > 100.1 && !decay.isDone(20);
+	assert decay.isDone(100) && decay.position(100) === 100 && decay.velocity(100) === 0;
+}
+
 test "a rubber band that never leaves the clamp behaves like plain decay" {
 	const config: DecayConfig = { ...decayConfig(), clampMin: 0, clampMax: 100000, rubberBand: true };
 	const decay = createDecay(config, 0, 2000);
