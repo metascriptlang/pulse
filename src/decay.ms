@@ -30,7 +30,7 @@ export function decayConfig(): DecayConfig {
 	return {
 		deceleration: 0.998,
 		velocityFactor: 1,
-		velocityThreshold: 1,
+		velocityThreshold: 0.05,
 		clampMin: null,
 		clampMax: null,
 		rubberBand: false,

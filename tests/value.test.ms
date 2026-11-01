@@ -238,10 +238,10 @@ test "a decay follows the decay simulation from the current value" {
 	clock.advance(100);
 	assert near(value.get(), reference.decayPosition(100), 1e-12);
 	assert value.velocity() > 0;
-	assert !reference.decayIsDone(30000);
-	for (let i: int32 = 0; i < 1000; i++) { clock.advance(50); }
+	assert !reference.decayIsDone(50000);
+	for (let i: int32 = 0; i < 1100; i++) { clock.advance(50); }
 	assert ends.finished === 1;
-	assert near(value.get(), reference.decayPosition(50000), 1e-12);
+	assert near(value.get(), reference.decayPosition(55000), 1e-12);
 }
 
 test "a sequence starts each step on the frame the step before it ends" {

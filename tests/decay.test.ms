@@ -49,19 +49,19 @@ test "position moves at the velocity it reports, whatever the sampling step" {
 	assert near(walked, decay.position(1000), 1e-9);
 }
 
-test "decay stops when the velocity falls under the threshold and then holds still" {
+test "decay stops when the velocity falls under Reanimated's 1/20 unit per second and then holds still" {
 	const decay = createDecay(decayConfig(), 0, 2000);
-	const stopSeconds = Math.log(2000) / 0.2;
+	const stopSeconds = Math.log(2000 * 20) / 0.2;
 	assert !decay.isDone(0);
 	assert !decay.isDone(stopSeconds * 1000 - 10);
 	assert decay.isDone(stopSeconds * 1000 + 10);
 	assert decay.position(stopSeconds * 1000 + 10) === decay.position(600000);
 	assert decay.velocity(stopSeconds * 1000 + 10) === 0;
-	assert decay.velocity(stopSeconds * 1000 - 10) > 0.9;
+	assert decay.velocity(stopSeconds * 1000 - 10) > 0.045;
 }
 
 test "a velocity under the threshold is done at once and leaves the value where it is" {
-	const decay = createDecay(decayConfig(), 42, 0.5);
+	const decay = createDecay(decayConfig(), 42, 0.04);
 	assert decay.isDone(0);
 	assert decay.position(5000) === 42;
 }
