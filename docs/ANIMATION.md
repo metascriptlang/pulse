@@ -241,6 +241,16 @@ a platform may only move a case between them, as WAAPI runs `decay` and a blendi
 evaluator. `Refused` passes only when building the case throws `motion: …`, the rule of criterion 7
 for a track a backend cannot run; a case that runs with another meaning fails, whatever it declared.
 
+Colour is held to Oklab. `derived.color` reads a derived colour (`interpolateColor`) whose
+midpoints lie far outside the tolerance of an sRGB mix, so an engine that interpolates colour in
+sRGB, as WAAPI does, marks that case and every colour track `Evaluator` and leaves them to Pulse;
+it never declares `Engine` for them. Events stay strict: an end callback is due at the checkpoint
+where the golden has it, with no frame of grace for an engine that reports completion late,
+because a callback starts the next animation of a composite sequence or `loop`, so a late one
+shifts everything after it by a frame per link, which no fixed tolerance bounds. An adapter
+fires callbacks from the app-thread clock at the end time the core computes, not from the
+engine's completion notice.
+
 ## Milestones
 
 | | what | proof |

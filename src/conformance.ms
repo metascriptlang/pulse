@@ -1,6 +1,6 @@
 import { Clock } from "./clock";
 import { CompositeAnimation } from "./composite";
-import { DerivedValue, ValueSource } from "./derived";
+import { DerivedColor, DerivedValue, ValueSource } from "./derived";
 import { MotionDocument } from "./document";
 import { WritableValue } from "./event";
 import { MotionPolicy } from "./policy";
@@ -145,7 +145,7 @@ export class ConformanceScene {
 	private valueNames: string[] = [];
 	private values: ConformanceValue[] = [];
 	private derivedNames: string[] = [];
-	private derived: DerivedValue[] = [];
+	private derived: (() => float64)[] = [];
 	private log: string[] = [];
 
 	constructor(adapter: ConformanceAdapter, testCase: ConformanceCase) {
@@ -223,7 +223,18 @@ export class ConformanceScene {
 
 	derive(name: string, value: DerivedValue): void {
 		this.derivedNames.push(name);
-		this.derived.push(value);
+		this.derived.push((): float64 => value.get());
+	}
+
+	deriveColor(name: string, color: DerivedColor): void {
+		this.derivedNames.push(name + ".r");
+		this.derived.push((): float64 => color.get().r);
+		this.derivedNames.push(name + ".g");
+		this.derived.push((): float64 => color.get().g);
+		this.derivedNames.push(name + ".b");
+		this.derived.push((): float64 => color.get().b);
+		this.derivedNames.push(name + ".a");
+		this.derived.push((): float64 => color.get().a);
 	}
 
 	record(event: string): void {
@@ -233,7 +244,7 @@ export class ConformanceScene {
 	read(name: string): float64 {
 		const derived = this.derivedNames.indexOf(name);
 		if (derived >= 0) {
-			return this.derived[derived].get();
+			return this.derived[derived]();
 		}
 		const value = this.valueNames.indexOf(name);
 		if (value >= 0) {

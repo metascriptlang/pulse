@@ -5,8 +5,10 @@ import {
 	ConformanceResult,
 	ConformanceSupport,
 	ConformanceTiming,
+	ConformanceTrace,
 	ConformanceValue,
 	GOLDEN_PRECISION,
+	compare,
 	runConformance,
 } from "../src/conformance";
 import { conformanceCases } from "../src/conformanceCases";
@@ -136,6 +138,7 @@ test "every contract item of docs/ANIMATION.md has a case" {
 		"decay",
 		"sequence",
 		"derived",
+		"derived.color",
 		"composite.parallel",
 		"composite.staggered",
 		"composite.loop",
@@ -165,6 +168,29 @@ test "a drift inside the case tolerance passes" {
 		CONFORMANCE_GOLDEN,
 	);
 	assert failures(results).length === 0;
+}
+
+test "a colour mixed in sRGB fails the colour case, whatever it declares" {
+	const testCase = only("derived.color")[0];
+	const golden = CONFORMANCE_GOLDEN.filter(
+		(trace: ConformanceTrace): boolean => trace.name === "derived.color",
+	)[0];
+	const halfway = golden.checkpoints[1];
+	assert halfway.at === 250;
+	const srgb: ConformanceTrace = {
+		...golden,
+		checkpoints: [
+			golden.checkpoints[0],
+			{ ...halfway, values: [0.5, 0, 0.5, 1, ...halfway.values.slice(4)] },
+			...golden.checkpoints.slice(2),
+		],
+	};
+	const declared = [ConformanceSupport.Engine, ConformanceSupport.Evaluator];
+	for (const support of declared) {
+		const found = compare(testCase, support, golden, srgb, testCase.tolerance);
+		assert found.length === 3, found.join("\n");
+		assert found[0].startsWith("derived.color at 250: tint.r is 0.5"), found[0];
+	}
 }
 
 test "an adapter that loses an event fails at the checkpoint where it was due" {

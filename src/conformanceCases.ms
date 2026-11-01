@@ -10,8 +10,19 @@ import {
 } from "./conformance";
 import { loop, parallel, staggered } from "./composite";
 import { decayConfig } from "./decay";
-import { Extrapolate, add, diffClamp, interpolated } from "./derived";
-import { MotionDocument, ValueKind, linearKeyframe } from "./document";
+import {
+	Extrapolate,
+	add,
+	diffClamp,
+	interpolated,
+	interpolatedColor,
+} from "./derived";
+import {
+	MotionColor,
+	MotionDocument,
+	ValueKind,
+	linearKeyframe,
+} from "./document";
 import { EventPayload, event } from "./event";
 import { Easing } from "./easing";
 import { ReduceMotion } from "./policy";
@@ -468,6 +479,52 @@ function derivedCase(): ConformanceCase {
 	};
 }
 
+function colorCase(): ConformanceCase {
+	const red: MotionColor = { r: 1, g: 0, b: 0, a: 1 };
+	const blue: MotionColor = { r: 0, g: 0, b: 1, a: 1 };
+	const white: MotionColor = { r: 1, g: 1, b: 1, a: 0.5 };
+	const dim: MotionColor = { r: 0.2, g: 0.3, b: 0.2, a: 1 };
+	const mid: MotionColor = { r: 0.4, g: 0.5, b: 0.3, a: 1 };
+	return {
+		...blank("derived.color"),
+		properties: [property("box.a")],
+		values: [value("a", "box.a")],
+		steps: [
+			at(0, (s: ConformanceScene): void => {
+				s.deriveColor(
+					"tint",
+					interpolatedColor(s.source("a"), {
+						inputRange: [0, 50, 100],
+						outputRange: [red, blue, white],
+						extrapolate: Extrapolate.Clamp,
+					}),
+				);
+				s.deriveColor(
+					"wide",
+					interpolatedColor(s.source("a"), {
+						inputRange: [0, 100],
+						outputRange: [dim, mid],
+					}),
+				);
+				s.animate("a", linear(100, 1000));
+			}),
+			at(1000, (s: ConformanceScene): void => {
+				s.animate("a", linear(150, 500));
+			}),
+		],
+		checkpoints: [0, 250, 500, 750, 1000, 1250, 1500],
+		reads: [
+			"tint.r",
+			"tint.g",
+			"tint.b",
+			"tint.a",
+			"wide.r",
+			"wide.g",
+			"wide.b",
+		],
+	};
+}
+
 function compositeCases(): ConformanceCase[] {
 	const pair = [property("box.a"), property("box.b")];
 	const both = (s: ConformanceScene): void => {
@@ -604,6 +661,7 @@ export function conformanceCases(): ConformanceCase[] {
 		reducedMotionCase(),
 		...physicsCases(),
 		derivedCase(),
+		colorCase(),
 		...compositeCases(),
 		...valueXYCases(),
 	];
