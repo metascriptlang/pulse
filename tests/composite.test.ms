@@ -275,3 +275,29 @@ test "zero iterations end at once; an endless loop that takes no time is refused
 		loop(animation(still, linear(1, 100))).start(null);
 	}) === "motion: an endless loop needs an iteration that takes time";
 }
+
+test "an endless loop whose iteration threw on start can start again" {
+	const scene = new Scene();
+	const spin = scene.value(0);
+	const ends = new Ends();
+	let failing = true;
+	const flaky: CompositeAnimation = {
+		start: (onEnd: ((finished: boolean) => void) | null): void => {
+			if (failing) {
+				failing = false;
+				throw new Error("motion: the first start fails");
+			}
+			spin.animate(linear(1, 100), onEnd);
+		},
+		stop: (): void => { spin.cancel(); },
+		reset: (): void => { spin.set(0); },
+	};
+	const forever = loop(flaky);
+	assert throws((): void => { forever.start(ends.handler); }) === "motion: the first start fails";
+	const again = throws((): void => { forever.start(ends.handler); });
+	assert again === "", again;
+	scene.manual.advance(50);
+	assert spin.get() === 0.5 && spin.isAnimating();
+	forever.stop();
+	assert ends.cancelled === 1;
+}

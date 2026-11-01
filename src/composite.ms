@@ -168,8 +168,11 @@ export function loop(
 				iterationsSoFar += 1;
 				if (resetBeforeIteration) { animation.reset(); }
 				starting = true;
-				animation.start(restart);
-				starting = false;
+				try {
+					animation.start(restart);
+				} finally {
+					starting = false;
+				}
 			};
 			if (iterations === 0) {
 				report(onEnd, true);
