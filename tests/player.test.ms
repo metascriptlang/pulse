@@ -1,6 +1,7 @@
 import { ManualClock } from "../src/clock";
 import { MotionDocument, MotionValue, ValueKind, linearKeyframe, numberValue } from "../src/document";
 import { MotionBinding, MotionOptions, MotionPlayer, motionOptions } from "../src/player";
+import { ScrollAxis, scrollSource } from "../src/scroll";
 
 function near(a: float64, b: float64): boolean {
 	return Math.abs(a - b) <= 1e-6;
@@ -568,4 +569,137 @@ test "isActive is true only while the playhead moves inside the clip" {
 	assert rig.player.isActive;
 	rig.clock.advance(2000);
 	assert !rig.player.isActive;
+}
+
+class ScrollRig {
+	at: float64 = 0;
+	range: float64 = 1000;
+	rig: Rig;
+
+	constructor(configure: (options: MotionOptions) => MotionOptions) {
+		const source = scrollSource({
+			offset: (axis: ScrollAxis): float64 => this.at,
+			max: (axis: ScrollAxis): float64 => this.range,
+			viewport: (axis: ScrollAxis): float64 => 100,
+		});
+		this.rig = new Rig((options: MotionOptions): MotionOptions =>
+			configure({ ...options, source })
+		);
+	}
+
+	scrollTo(offset: float64): void {
+		this.at = offset;
+		this.rig.clock.advance(4);
+	}
+}
+
+function scrolling(): ScrollRig {
+	return new ScrollRig((options: MotionOptions): MotionOptions => options);
+}
+
+test "a scroll source maps progress onto the playhead at the next frame" {
+	const scroll = scrolling();
+	scroll.scrollTo(250);
+	assert near(scroll.rig.probe.last(), 25) && near(scroll.rig.player.time, 250);
+	scroll.scrollTo(1000);
+	assert near(scroll.rig.probe.last(), 100);
+	const log = scroll.rig.events.log.join(" ");
+	assert log === "start update update complete", log;
+	assert scroll.rig.clock.pending() === 1, "it keeps following the scroller";
+}
+
+test "an unchanged scroll offset writes nothing, however much time passes" {
+	const scroll = scrolling();
+	scroll.scrollTo(500);
+	const writes = scroll.rig.probe.writes.length;
+	scroll.rig.clock.advance(2000);
+	assert scroll.rig.probe.writes.length === writes;
+}
+
+test "scrolling back past zero reverse-completes, and forward again restarts" {
+	const scroll = scrolling();
+	scroll.scrollTo(500);
+	scroll.scrollTo(0);
+	scroll.scrollTo(300);
+	assert scroll.rig.events.count("reverseComplete") === 1;
+	assert scroll.rig.events.count("start") === 2;
+	assert near(scroll.rig.probe.last(), 30);
+}
+
+test "a delay takes its proportion of the scroll range" {
+	const scroll = new ScrollRig((options: MotionOptions): MotionOptions => ({
+		...options,
+		delay: 250,
+	}));
+	scroll.scrollTo(100);
+	assert scroll.rig.probe.writes.length === 0;
+	scroll.scrollTo(600);
+	assert near(scroll.rig.probe.last(), 50);
+}
+
+test "an inactive scroll timeline holds the last value" {
+	const scroll = scrolling();
+	scroll.scrollTo(400);
+	scroll.range = 0;
+	scroll.scrollTo(0);
+	assert near(scroll.rig.probe.last(), 40);
+	assert scroll.rig.events.count("reverseComplete") === 0;
+	scroll.range = 1000;
+	scroll.scrollTo(0);
+	assert near(scroll.rig.probe.last(), 0);
+	assert scroll.rig.events.count("reverseComplete") === 1;
+}
+
+test "a paused scroll player stops following, and play follows again" {
+	const scroll = scrolling();
+	scroll.scrollTo(200);
+	scroll.rig.player.pause();
+	scroll.scrollTo(700);
+	assert near(scroll.rig.probe.last(), 20) && scroll.rig.clock.pending() === 0;
+	scroll.rig.player.play();
+	scroll.rig.clock.advance(4);
+	assert near(scroll.rig.probe.last(), 70);
+}
+
+function scrollConstruction(
+	clock: ManualClock,
+	configure: (options: MotionOptions) => MotionOptions,
+): string {
+	const source = scrollSource({
+		offset: (axis: ScrollAxis): float64 => 0,
+		max: (axis: ScrollAxis): float64 => 1000,
+		viewport: (axis: ScrollAxis): float64 => 100,
+	});
+	return refusal((): void => {
+		new MotionPlayer(
+			rampDocument(),
+			[new Probe().binding(true)],
+			configure({ ...motionOptions(clock.clock), source }),
+		);
+	});
+}
+
+test "a scroll source refuses endless repeat, a rate other than 1 and reverse" {
+	const clock = new ManualClock();
+	const endless = scrollConstruction(
+		clock,
+		(options: MotionOptions): MotionOptions => ({ ...options, repeat: -1 }),
+	);
+	assert endless === "motion: endless repeat has no duration on a scroll source";
+	const faster = scrollConstruction(
+		clock,
+		(options: MotionOptions): MotionOptions => ({ ...options, timeScale: 2 }),
+	);
+	assert faster === "motion: timeScale must be 1 on a scroll source";
+	const repeated = scrollConstruction(
+		clock,
+		(options: MotionOptions): MotionOptions => ({ ...options, repeat: 2 }),
+	);
+	assert repeated === "" && clock.pending() === 1;
+	const scroll = scrolling();
+	const backwards = refusal((): void => { scroll.rig.player.setTimeScale(-1); });
+	assert backwards === "motion: timeScale must be 1 on a scroll source";
+	const reversed = refusal((): void => { scroll.rig.player.reverse(); });
+	assert reversed === "motion: a scroll source cannot reverse";
+	assert scroll.rig.player.timeScale === 1;
 }

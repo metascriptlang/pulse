@@ -2,6 +2,12 @@ import { Clock } from "./clock";
 import { ComposedTrack, flatten, localTime, writerAt } from "./compose";
 import { MotionDocument, MotionValue, findClip, validate } from "./document";
 import { sampleTrack } from "./evaluate";
+import {
+	TimeSource,
+	TimeSourceKind,
+	sourceProgress,
+	timeSource,
+} from "./scroll";
 import { Composition, MotionTarget, TargetClaim } from "./target";
 
 const PLAYHEAD_EPSILON: float64 = 1e-8;
@@ -23,6 +29,7 @@ export struct MotionOptions {
 	timeScale: float64;
 	paused: boolean;
 	clock: Clock;
+	source: TimeSource;
 	composition: Composition;
 }
 
@@ -35,6 +42,7 @@ export function motionOptions(clock: Clock): MotionOptions {
 		timeScale: 1,
 		paused: false,
 		clock,
+		source: timeSource(),
 		composition: Composition.Replace,
 	};
 }
@@ -120,6 +128,8 @@ export class MotionPlayer {
 
 	private targets: ActiveTarget[];
 	private clock: Clock;
+	private source: TimeSource;
+	private fedPosition: float64 | null = null;
 	private iterationDuration: float64;
 	private delayTime: float64;
 	private repeatCount: int32;
@@ -148,6 +158,10 @@ export class MotionPlayer {
 			fail("repeatDelay must be finite and not negative");
 		}
 		this.clock = options.clock;
+		this.source = options.source;
+		if (this.scrolled() && options.repeat < 0) {
+			fail("endless repeat has no duration on a scroll source");
+		}
 		this.iterationDuration = findClip(doc, doc.root).duration;
 		this.delayTime = options.delay;
 		this.repeatCount = options.repeat;
@@ -239,6 +253,7 @@ export class MotionPlayer {
 
 	reverse(from: float64 | null = null, suppressEvents: boolean = true): void {
 		this.live();
+		if (this.scrolled()) { fail("a scroll source cannot reverse"); }
 		if (from !== null) { this.moveTo(from !== 0 ? from : this.totalDur, suppressEvents); }
 		this.scale = -Math.abs(this.scale);
 		this.release();
@@ -329,6 +344,7 @@ export class MotionPlayer {
 		for (const target of this.targets) { target.reached.fill(false); }
 		this.initted = false;
 		this.initial = [];
+		this.fedPosition = null;
 		this.playhead = -this.delayTime;
 		this.renderedTotalTime = 0;
 		this.renderedTime = 0;
@@ -352,6 +368,7 @@ export class MotionPlayer {
 
 	private checkedScale(value: float64): float64 {
 		if (!Number.isFinite(value) || value === 0) { fail("timeScale must be finite and not zero"); }
+		if (value !== 1 && this.scrolled()) { fail("timeScale must be 1 on a scroll source"); }
 		return value;
 	}
 
@@ -370,8 +387,13 @@ export class MotionPlayer {
 		return cycleIndex(this.renderedTotalTime, this.cycle()) * this.cycle();
 	}
 
+	private scrolled(): boolean {
+		return this.source.kind !== TimeSourceKind.Time;
+	}
+
 	private wantsFrame(): boolean {
 		if (this.isDisposed || this.isPaused) { return false; }
+		if (this.scrolled()) { return true; }
 		return this.scale > 0 ? this.playhead < this.totalDur : this.playhead > 0;
 	}
 
@@ -401,12 +423,27 @@ export class MotionPlayer {
 
 	private tick(time: float64): void {
 		this.frameId = 0;
+		if (this.scrolled()) {
+			this.follow();
+			if (this.wantsFrame() && this.frameId === 0) { this.requestFrame(); }
+			return;
+		}
 		const lowest = this.scale < 0 ? 0 : -this.delayTime;
 		const delta = Math.max(0, time - this.lastFrameTime);
 		this.lastFrameTime = time;
 		const next = Math.min(Math.max(this.playhead + delta * this.scale, lowest), this.totalDur);
 		this.moveTo(next, false);
 		if (this.wantsFrame() && this.frameId === 0) { this.requestFrame(); }
+	}
+
+	private follow(): void {
+		const progress = sourceProgress(this.source);
+		if (progress === null) { return; }
+		const span = this.delayTime + this.totalDur;
+		const position = progress * span - this.delayTime;
+		if (position === this.fedPosition) { return; }
+		this.fedPosition = position;
+		this.moveTo(position, false);
 	}
 
 	private moveTo(position: float64, suppressEvents: boolean): void {

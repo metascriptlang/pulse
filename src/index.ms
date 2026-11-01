@@ -28,6 +28,19 @@ export {
 export { interpolate, sampleTrack } from "./evaluate";
 export { Clock, ManualClock } from "./clock";
 export { MotionBinding, MotionOptions, MotionPlayer, motionOptions } from "./player";
+export {
+	ScrollAxis,
+	ScrollSource,
+	TimeSource,
+	TimeSourceKind,
+	ViewInset,
+	ViewRange,
+	ViewSubject,
+	scrollSource,
+	sourceProgress,
+	timeSource,
+	viewSource,
+} from "./scroll";
 export { Composition, MotionTarget } from "./target";
 export { SpringKind, SpringConfig, SpringSimulation, springByStiffness, springByDuration, createSpring } from "./spring";
 export { DecayConfig, DecaySimulation, decayConfig, createDecay } from "./decay";
