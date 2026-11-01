@@ -235,6 +235,29 @@ test "finish refuses an endless repeat played forwards, and reaches zero played 
 	assert rig.player.totalTime === 0 && rig.events.count("reverseComplete") === 1;
 }
 
+test "a non-finite playhead is refused at every entry point and moves nothing" {
+	const rig = plain();
+	rig.clock.advance(300);
+	const written = rig.probe.writes.length;
+	const moves: (() => void)[] = [
+		(): void => { rig.player.seek(NaN); },
+		(): void => { rig.player.seek(Infinity); },
+		(): void => { rig.player.play(NaN); },
+		(): void => { rig.player.pause(-Infinity); },
+		(): void => { rig.player.reverse(NaN); },
+		(): void => { rig.player.setTotalTime(NaN); },
+		(): void => { rig.player.setTime(Infinity); },
+		(): void => { rig.player.setProgress(NaN); },
+		(): void => { rig.player.setTotalProgress(Infinity); },
+	];
+	for (const move of moves) {
+		const refused = refusal(move);
+		assert refused.startsWith("motion: a playhead position must be finite"), refused;
+	}
+	assert rig.probe.writes.length === written && rig.player.rawTime === 300;
+	assert !rig.player.paused && !rig.player.reversed;
+}
+
 test "reverse plays backwards from the current time and completes at zero" {
 	const rig = plain();
 	rig.clock.advance(600);

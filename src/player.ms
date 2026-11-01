@@ -448,6 +448,7 @@ export class MotionPlayer {
 	}
 
 	private moveTo(position: float64, suppressEvents: boolean): void {
+		if (!Number.isFinite(position)) { fail("a playhead position must be finite, got " + position); }
 		this.playhead = Math.min(Math.max(position, -this.delayTime), this.totalDur);
 		this.render(position, suppressEvents);
 		this.sync();
