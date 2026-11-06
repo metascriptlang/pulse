@@ -1,6 +1,12 @@
 import { Clock } from "./clock";
 import { MotionPolicy } from "./policy";
-import { AnimatedValue, AnimationSpec, delay, timing } from "./value";
+import {
+	AnimatedValue,
+	AnimationSpec,
+	chainedEndTime,
+	delay,
+	timing,
+} from "./value";
 
 export interface CompositeAnimation {
 	start: (onEnd: ((finished: boolean) => void) | null) => void;
@@ -155,6 +161,7 @@ export function loop(
 	let isFinished = false;
 	let iterationsSoFar: int32 = 0;
 	let starting = false;
+	let iterationStart: float64 | null = null;
 	return {
 		start: (onEnd: ((finished: boolean) => void) | null): void => {
 			const restart = (finished: boolean): void => {
@@ -162,11 +169,15 @@ export function loop(
 					report(onEnd, finished);
 					return;
 				}
-				if (starting && iterations === -1) {
+				const endTime = chainedEndTime();
+				const tookNoTime = iterationStart === null ||
+					endTime === iterationStart;
+				if (starting && iterations === -1 && tookNoTime) {
 					fail("an endless loop needs an iteration that takes time");
 				}
 				iterationsSoFar += 1;
 				if (resetBeforeIteration) { animation.reset(); }
+				iterationStart = endTime;
 				starting = true;
 				try {
 					animation.start(restart);

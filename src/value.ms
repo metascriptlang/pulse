@@ -155,6 +155,25 @@ function sameSpringConfig(a: SpringConfig, b: SpringConfig): boolean {
 		a.clampMin === b.clampMin && a.clampMax === b.clampMax;
 }
 
+function restElapsed(simulation: SpringSimulation, doneAt: float64): float64 {
+	if (simulation.springIsDone(0)) {
+		return 0;
+	}
+	let moving: float64 = 0;
+	let resting = doneAt;
+	while (true) {
+		const middle = (moving + resting) / 2;
+		if (middle <= moving || middle >= resting) {
+			return resting;
+		}
+		if (simulation.springIsDone(middle)) {
+			resting = middle;
+		} else {
+			moving = middle;
+		}
+	}
+}
+
 class Run {
 	spec: AnimationSpec;
 	children: Run[] = [];
@@ -166,6 +185,7 @@ class Run {
 	current: float64 = 0;
 	velocityPerSecond: float64 = 0;
 	startTime: float64 = 0;
+	endTime: float64 = 0;
 	startValue: float64 = 0;
 	springSimulation: SpringSimulation | null = null;
 	decaySimulation: DecaySimulation | null = null;
@@ -217,6 +237,7 @@ class Run {
 	start(value: float64, now: float64, previous: Run | null): void {
 		this.finished = false;
 		this.settled = false;
+		this.startTime = now;
 		match (this.spec.kind) {
 			AnimationKind.Timing => this.startTiming(value, now, previous),
 			AnimationKind.Spring => this.startSpring(value, now, previous),
@@ -333,6 +354,7 @@ class Run {
 	frame(now: float64): boolean {
 		if (this.settled) {
 			this.finished = true;
+			this.endTime = this.startTime;
 			return true;
 		}
 		const done = match (this.spec.kind) {
@@ -355,6 +377,7 @@ class Run {
 		}
 		if (runtime >= this.spec.durationMs - PLAYHEAD_EPSILON) {
 			this.current = this.to;
+			this.endTime = Math.min(this.startTime + this.spec.durationMs, now);
 			return true;
 		}
 		const progress = this.spec.easing(runtime / this.spec.durationMs);
@@ -370,7 +393,11 @@ class Run {
 		const elapsed = now - this.startTime;
 		this.current = simulation.springPosition(elapsed);
 		this.velocityPerSecond = simulation.springVelocity(elapsed);
-		return simulation.springIsDone(elapsed);
+		if (!simulation.springIsDone(elapsed)) {
+			return false;
+		}
+		this.endTime = this.startTime + restElapsed(simulation, elapsed);
+		return true;
 	}
 
 	frameDecay(now: float64): boolean {
@@ -381,35 +408,50 @@ class Run {
 		const elapsed = now - this.startTime;
 		this.current = simulation.decayPosition(elapsed);
 		this.velocityPerSecond = simulation.decayVelocity(elapsed);
-		return simulation.decayIsDone(elapsed);
+		if (!simulation.decayIsDone(elapsed)) {
+			return false;
+		}
+		this.endTime = this.startTime +
+			Math.min(Math.max(simulation.endSeconds * 1000, 0), elapsed);
+		return true;
 	}
 
 	frameSequence(now: float64): boolean {
-		const child = this.children[this.index];
-		const done = child.frame(now);
+		let child = this.children[this.index];
+		while (child.frame(now)) {
+			const next = this.nextUnreduced(this.index + 1);
+			if (next === this.children.length) {
+				this.current = child.current;
+				this.endTime = child.endTime;
+				return true;
+			}
+			this.index = next;
+			this.children[next].start(child.current, child.endTime, child);
+			child = this.children[next];
+		}
 		this.current = child.current;
-		if (!done) {
-			return false;
-		}
-		this.index = this.nextUnreduced(this.index + 1);
-		if (this.index < this.children.length) {
-			this.children[this.index].start(child.current, now, child);
-			return false;
-		}
-		this.index = this.children.length - 1;
-		return true;
+		return false;
 	}
 
 	frameDelay(now: float64): boolean {
 		const child = this.children[0];
 		if (now - this.startTime >= this.spec.durationMs - PLAYHEAD_EPSILON || this.reduce) {
 			if (!this.begun) {
-				child.start(this.current, now, this.previous);
+				const begin = this.reduce
+					? this.startTime
+					: Math.min(this.startTime + this.spec.durationMs, now);
+				const previous = this.previous;
+				if (previous !== null && !previous.finished && !this.reduce) {
+					previous.frame(begin);
+					this.current = previous.current;
+				}
+				child.start(this.current, begin, previous);
 				this.previous = null;
 				this.begun = true;
 			}
 			const done = child.frame(now);
 			this.current = child.current;
+			this.endTime = child.endTime;
 			return done;
 		}
 		const previous = this.previous;
@@ -425,26 +467,45 @@ class Run {
 
 	frameRepeat(now: float64): boolean {
 		const child = this.children[0];
-		const done = child.frame(now);
+		while (child.frame(now)) {
+			this.reps += 1;
+			if (this.reduce || (this.spec.count > 0 && this.reps >= this.spec.count)) {
+				this.current = child.current;
+				this.endTime = child.endTime;
+				return true;
+			}
+			if (this.spec.count <= 0 && child.endTime <= this.startTime) {
+				throw new Error(
+					"motion: an endless repeat needs an iteration that takes time",
+				);
+			}
+			const startValue = this.spec.reverse ? child.current : this.startValue;
+			if (this.spec.reverse) {
+				child.to = this.startValue;
+				this.startValue = startValue;
+			}
+			this.startTime = child.endTime;
+			child.start(startValue, child.endTime, null);
+		}
 		this.current = child.current;
-		if (!done) {
-			return false;
-		}
-		this.reps += 1;
-		if (this.reduce || (this.spec.count > 0 && this.reps >= this.spec.count)) {
-			return true;
-		}
-		const startValue = this.spec.reverse ? child.current : this.startValue;
-		if (this.spec.reverse) {
-			child.to = this.startValue;
-			this.startValue = startValue;
-		}
-		child.start(startValue, now, null);
 		return false;
 	}
 }
 
 const LABEL = "an animated value";
+
+struct ChainedEnd {
+	clock: Clock;
+	endTime: float64;
+	frameTime: float64;
+}
+
+let chainedEnd: ChainedEnd | null = null;
+
+export function chainedEndTime(): float64 | null {
+	const chained = chainedEnd;
+	return chained === null ? null : chained.endTime;
+}
 
 export class AnimatedValue {
 	private value: float64;
@@ -549,8 +610,14 @@ export class AnimatedValue {
 			run.reduce = shouldReduce(ReduceMotion.System, this.policy);
 			run.reduceSet = true;
 		}
-		const now = this.clock.now();
-		run.start(start, now, previous);
+		const chained = previous === null ? chainedEnd : null;
+		let now = this.clock.now();
+		let startTime = now;
+		if (chained !== null && chained.clock === this.clock) {
+			now = chained.frameTime;
+			startTime = chained.endTime;
+		}
+		run.start(start, startTime, previous);
 		if (target !== null) {
 			this.claim = target.claim(
 				this.composition,
@@ -661,7 +728,16 @@ export class AnimatedValue {
 			this.release();
 			const onEnd = this.onEnd;
 			this.onEnd = null;
-			if (onEnd !== null) { onEnd(true); }
+			if (onEnd === null) {
+				return;
+			}
+			const outer = chainedEnd;
+			chainedEnd = { clock: this.clock, endTime: run.endTime, frameTime: now };
+			try {
+				onEnd(true);
+			} finally {
+				chainedEnd = outer;
+			}
 			return;
 		}
 		this.frameId = this.clock.request((time: float64): void => {

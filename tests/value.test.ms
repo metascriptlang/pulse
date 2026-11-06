@@ -342,9 +342,9 @@ test "a delay keeps the interrupted animation moving until it starts" {
 	clock.advance(20);
 	assert value.get() === 70;
 	clock.advance(20);
-	assert value.get() === 70, "the delayed step starts from the last frame's value";
+	assert value.get() === 90, "the delayed step starts from the value at the delay's end";
 	clock.advance(50);
-	assert value.get() === 35;
+	assert value.get() === 45;
 	assert first.finished === 0, "the interrupted animation never reports again";
 }
 
@@ -354,12 +354,12 @@ test "a repeat restarts from the start value on the frame it ends" {
 	const ends = new Ends();
 	value.animate(repeat(linear(100, 100), 3), ends.handler);
 	clock.advance(100);
-	assert value.get() === 100;
+	assert value.get() === 0;
 	assert value.isAnimating();
 	clock.advance(50);
 	assert value.get() === 50;
 	clock.advance(50);
-	assert value.get() === 100;
+	assert value.get() === 0;
 	clock.advance(100);
 	assert value.get() === 100;
 	assert ends.finished === 1 && ends.cancelled === 0;
@@ -476,9 +476,7 @@ test "reduced motion: an inner Never step of a sequence still plays" {
 	clock.advance(50);
 	assert value.get() === 50;
 	clock.advance(50);
-	assert value.get() === 100;
-	clock.advance(1);
-	assert value.get() === 30;
+	assert value.get() === 30, "the reduced step settles in the frame the kept one ends";
 	assert ends.finished === 1;
 }
 
@@ -555,4 +553,84 @@ test "invalid specs fail loud" {
 	const clock = new ManualClock();
 	const value = new AnimatedValue(0, clock.clock, new MotionPolicy());
 	assert throws(() => { value.set(NaN); }).startsWith("motion: ");
+}
+
+const FRAMES_PER_100_MS: int32[] = [25, 6, 3, 12];
+
+function traced(
+	framesPer100: int32,
+	horizon: int32,
+	spec: AnimationSpec,
+): float64[] {
+	const clock = new ManualClock();
+	const value = new AnimatedValue(0, clock.clock, new MotionPolicy());
+	const probe = new AnimatedValue(0, clock.clock, new MotionPolicy());
+	value.animate(spec, (finished: boolean): void => {
+		probe.animate(linear(1e6, 1e6));
+	});
+	const samples: float64[] = [];
+	for (let frame: int32 = 1; frame <= framesPer100 * horizon; frame++) {
+		const time = ((frame * 100) as float64) / (framesPer100 as float64);
+		clock.advance(time - clock.time);
+		if (frame % framesPer100 === 0) { samples.push(value.get()); }
+	}
+	samples.push(clock.time - probe.get());
+	return samples;
+}
+
+function sameAtEveryFrameRate(
+	horizon: int32,
+	spec: AnimationSpec,
+	end: float64,
+): boolean {
+	const reference = traced(FRAMES_PER_100_MS[0], horizon, spec);
+	if (!near(reference[reference.length - 1], end, 1e-9)) { return false; }
+	for (const framesPer100 of FRAMES_PER_100_MS) {
+		const samples = traced(framesPer100, horizon, spec);
+		for (let i: int32 = 0; i < samples.length; i++) {
+			if (!near(samples[i], reference[i], 1e-9)) { return false; }
+		}
+	}
+	return true;
+}
+
+test "a sequence is the same at every frame rate: each step starts where the last ended" {
+	assert sameAtEveryFrameRate(
+		4,
+		sequence(linear(100, 110), linear(0, 100), linear(50, 95)),
+		305,
+	);
+}
+
+test "a delay is the same at every frame rate, alone and inside a sequence" {
+	assert sameAtEveryFrameRate(3, delay(105, linear(100, 110)), 215);
+	assert sameAtEveryFrameRate(
+		3,
+		sequence(linear(40, 55), delay(65, linear(100, 110))),
+		230,
+	);
+}
+
+test "a repeat is the same at every frame rate" {
+	assert sameAtEveryFrameRate(5, repeat(linear(100, 70), 5, true), 350);
+}
+
+test "a spring step inside a sequence is the same at every frame rate" {
+	const springy = spring(0, springByStiffness(1000, 60, 1));
+	const settled = traced(25, 15, sequence(linear(100, 110), springy));
+	const end = settled[settled.length - 1];
+	assert end > 110 && end < 1000;
+	assert sameAtEveryFrameRate(
+		15,
+		sequence(linear(100, 110), springy, linear(30, 70)),
+		end + 70,
+	);
+}
+
+test "an endless repeat of an iteration that takes no time is refused" {
+	const clock = new ManualClock();
+	const value = new AnimatedValue(1, clock.clock, new MotionPolicy());
+	assert throws((): void => {
+		value.animate(repeat(linear(1, 0), -1));
+	}) === "motion: an endless repeat needs an iteration that takes time";
 }

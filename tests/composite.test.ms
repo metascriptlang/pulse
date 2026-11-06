@@ -318,3 +318,93 @@ test "an endless loop whose iteration threw on start can start again" {
 	forever.stop();
 	assert ends.cancelled === 1;
 }
+
+test "an endless loop of iterations shorter than a frame keeps running" {
+	const scene = new Scene();
+	const spin = scene.value(0);
+	const forever = loop(animation(spin, linear(1, 3)));
+	forever.start(null);
+	for (let i: int32 = 0; i < 10; i += 1) { scene.manual.advance(16); }
+	assert spin.isAnimating() && Math.abs(spin.get() - 1.0 / 3.0) < 1e-12;
+	forever.stop();
+}
+
+const FRAMES_PER_100_MS: int32[] = [25, 6, 3, 12];
+
+function traced(
+	framesPer100: int32,
+	horizon: int32,
+	build: (scene: Scene, values: AnimatedValue[]) => CompositeAnimation,
+): float64[] {
+	const scene = new Scene();
+	const values: AnimatedValue[] = [];
+	const probe = scene.value(0);
+	build(scene, values).start((finished: boolean): void => {
+		probe.animate(linear(1e6, 1e6));
+	});
+	const samples: float64[] = [];
+	for (let frame: int32 = 1; frame <= framesPer100 * horizon; frame++) {
+		const time = ((frame * 100) as float64) / (framesPer100 as float64);
+		scene.manual.advance(time - scene.manual.time);
+		if (frame % framesPer100 === 0) {
+			for (const value of values) { samples.push(value.get()); }
+		}
+	}
+	samples.push(scene.manual.time - probe.get());
+	return samples;
+}
+
+function sameAtEveryFrameRate(
+	horizon: int32,
+	end: float64,
+	build: (scene: Scene, values: AnimatedValue[]) => CompositeAnimation,
+): boolean {
+	const reference = traced(FRAMES_PER_100_MS[0], horizon, build);
+	if (Math.abs(reference[reference.length - 1] - end) > 1e-9) { return false; }
+	for (const framesPer100 of FRAMES_PER_100_MS) {
+		const samples = traced(framesPer100, horizon, build);
+		for (let i: int32 = 0; i < samples.length; i++) {
+			if (Math.abs(samples[i] - reference[i]) > 1e-9) { return false; }
+		}
+	}
+	return true;
+}
+
+test "a stagger is the same at every frame rate: each child starts at its offset" {
+	assert sameAtEveryFrameRate(
+		4,
+		245,
+		(scene: Scene, values: AnimatedValue[]): CompositeAnimation => {
+			const runs: CompositeAnimation[] = [];
+			for (let i: int32 = 0; i < 3; i += 1) {
+				const value = scene.value(0);
+				values.push(value);
+				const steps = sequence(linear(10, 70), linear(0, 85));
+				runs.push(animation(value, steps));
+			}
+			return staggered(45, runs, scene.manual.clock, scene.policy);
+		},
+	);
+}
+
+test "a loop is the same at every frame rate: each iteration starts where the last ended" {
+	assert sameAtEveryFrameRate(
+		4,
+		280,
+		(scene: Scene, values: AnimatedValue[]): CompositeAnimation => {
+			const value = scene.value(0);
+			values.push(value);
+			return loop(animation(value, linear(100, 70)), 4);
+		},
+	);
+	assert sameAtEveryFrameRate(
+		4,
+		330,
+		(scene: Scene, values: AnimatedValue[]): CompositeAnimation => {
+			const value = scene.value(0);
+			values.push(value);
+			const steps = sequence(linear(30, 45), linear(5, 65));
+			return loop(animation(value, steps), 3, false);
+		},
+	);
+}
