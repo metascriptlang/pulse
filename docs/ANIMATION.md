@@ -151,6 +151,11 @@ Nothing traced so far needed a **NEW MECHANISM**: every part is a port of one of
   channel, and strings with units (`"45deg"`) are not parsed: the consumer formats a number.
 - **`dispose` follows Flutter** (`animation_controller.dart:902-920`): it ends the running
   animation with `finished = false`, notifies no listener, and refuses every later call.
+- **The interrupting call supersedes a run its interruption started.** Reanimated calls the old
+  animation's `callback(false)` before it installs the new one (`valueSetter.ts:13-15,67`), so an
+  animation that callback starts is overwritten yet keeps writing and calls back `true`. An
+  `animate`, `set` or `cancel` on a Pulse value interrupts until no run is left: it wins, and
+  every run it supersedes ends once with `finished = false` and writes no later frame.
 
 ## Where it runs
 
