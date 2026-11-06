@@ -114,6 +114,21 @@ Nothing traced so far needed a **NEW MECHANISM**: every part is a port of one of
   like Reanimated's (`springUtils.ts:267-293` searches on the critical envelope it runs).
 - **Velocity crosses sequence, delay and repeat.** Reanimated hands 0 out of a wrapper; a spring
   after a wrapped spring then jumps. Criterion 6 asks for continuous retargeting.
+- **A composed step starts at the end the step before it computed, not at the frame that sees
+  it** (the person, 2026-11-06). Reanimated starts the next step at the frame's `now`
+  (`sequence.ts:122`, `delay.ts:50-56`, `repeat.ts:82-87`) and React Native starts the next
+  animation from the end callback (`AnimatedImplementation.js:326,332,482`), so a 110 ms then a
+  100 ms timing ends at 212 ms on a 4 ms clock and at 233 ms at 30 Hz. Pulse places segments at
+  absolute times, as Flutter's `Interval` and `TweenSequence` (`curves.dart:158`,
+  `tween_sequence.dart:56-91`), GSAP's position parameter (`_parsePosition` :390-412) and Motion's
+  sequences (`src/animation/sequence/create.ts`, not read locally) do: a timing ends at its start
+  plus its duration, a decay at its end time, a spring at the first instant its energy test passes
+  (bisected; the energy only falls), and the next step of a sequence, delay or repeat starts there
+  and is sampled at the frame's time in the same frame; a delay reads the run it interrupted at
+  its own end. An animation started from a value's natural end callback on the same clock starts
+  at that end, which carries `composite.ms`'s sequence, stagger and loop and an app's own
+  chaining; one that interrupts a running value, a retarget, starts at now. An endless repeat or
+  loop whose iteration takes no time is refused.
 - **Refusals instead of warnings or silent defaults.** An invalid spring config, an empty
   `sequence()`, an unknown label, an unreadable or percent position, and a placement that ends
   after its parent's duration all throw `motion: …`. The references warn, snap, or substitute 0.
