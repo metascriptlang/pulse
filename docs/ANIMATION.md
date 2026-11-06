@@ -108,7 +108,10 @@ Nothing traced so far needed a **NEW MECHANISM**: every part is a port of one of
   the result depends on the frame rate. That breaks "the same result on every backend", so decay
   follows Flutter's friction simulation.
 - **A true overdamped spring.** Reanimated uses the critical solution for every ratio ≥ 1
-  (`spring.ts:115-130`); `spring.ms` uses Flutter's overdamped solution above 1.
+  (`spring.ts:115-130`); `spring.ms` uses Flutter's overdamped solution above 1. A duration
+  spring searches its stiffness on that solution, with the ratio a clamp lifted it to, and its
+  upper bracket scaled by the fast-to-slow mode ratio squared, so it rests at 1.5 × its duration
+  like Reanimated's (`springUtils.ts:267-293` searches on the critical envelope it runs).
 - **Velocity crosses sequence, delay and repeat.** Reanimated hands 0 out of a wrapper; a spring
   after a wrapped spring then jumps. Criterion 6 asks for continuous retargeting.
 - **Refusals instead of warnings or silent defaults.** An invalid spring config, an empty
