@@ -126,11 +126,18 @@ Nothing traced so far needed a **NEW MECHANISM**: every part is a port of one of
   own.
 - **Contention between writers is anime's composition, with no hidden writer.** `target.ms`:
   writers that carry one `MotionTarget` replace (default, `core/globals.js:54`), blend
-  (`composition.js:221-259`, `additive.js:53-73`) or ignore each other (`none`). Two departures:
+  (`composition.js:221-259`, `additive.js:53-73`) or ignore each other (`none`). A blended writer
+  adds a delta onto a base that jumps to the newest end, as anime's lookup tween does
+  (`composition.js:240-256`, summed at `additive.js:59-72`), with no division. Three departures:
   a Replace writer and a Blend writer on one target stop each other instead of both writing with
-  the blend applied last (`engine.js:92`), which shows the same value; and a blended player keeps
-  its own document keyframes, scaling its delta by (base − end)/(start − end) where anime drops an
-  explicit `from`, because a document's keyframes are data the editor owns. Not ported: anime's
+  the blend applied last (`engine.js:92`), which shows the same value; a blended player keeps
+  its own document keyframes, adding their motion relative to its end (value − end) plus the
+  join offset (base − its start) faded linearly over its remaining playhead time, where anime
+  drops an explicit `from`, because a document's keyframes are data the editor owns and may
+  return to their start (a round trip, an odd yoyo), where a ratio of values has no meaning; for
+  one linear segment this equals anime; and a cancelled or disposed blended writer folds its
+  current delta into the base, where anime removes it (`composition.js:280-290`), because cancel
+  holds the current value (§Contract); a revert drops it. Not ported: anime's
   absolute-timeline truncation (`render.js:197-205`), so seeking a replaced player backwards does
   not replay the part it wrote before the takeover.
 - **A colour output range mixes in Oklab.** React Native interpolates each RGBA channel of a
