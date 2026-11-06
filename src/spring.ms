@@ -128,9 +128,16 @@ function energyFractionAtSettle(
 	stiffness: float64,
 	x0: float64,
 	v0: float64,
+	zeta: float64,
 	config: SpringConfig,
 ): float64 {
 	const settlingSeconds = config.durationMs * DURATION_PERCEPTUAL_COEFFICIENT / 1000;
+	if (zeta > 1 + CRITICAL_ZETA_TOLERANCE) {
+		const omega0 = Math.sqrt(stiffness / config.mass);
+		const run = assemble(config, stiffness, zeta, omega0, 0, x0, 0, v0, false);
+		return energy(run.displacementAt(settlingSeconds), run.rateAt(settlingSeconds), stiffness, config.mass) /
+			energy(x0, v0, stiffness, config.mass);
+	}
 	const decayRate = Math.sqrt(stiffness / config.mass) * config.dampingRatio;
 	const envelope = Math.exp(-decayRate * settlingSeconds);
 	const slope = v0 + x0 * decayRate;
@@ -140,23 +147,31 @@ function energyFractionAtSettle(
 		energy(x0, v0, stiffness, config.mass);
 }
 
-function stiffnessForDuration(x0: float64, v0: float64, config: SpringConfig): float64 {
+function slowModeStiffnessScale(zeta: float64): float64 {
+	if (zeta <= 1 + CRITICAL_ZETA_TOLERANCE) {
+		return 1;
+	}
+	const fastOverSlow = zeta + Math.sqrt(zeta * zeta - 1);
+	return fastOverSlow * fastOverSlow;
+}
+
+function stiffnessForDuration(x0: float64, v0: float64, zeta: float64, config: SpringConfig): float64 {
 	const threshold = config.energyThreshold;
 	const precision = threshold * 1e-3;
 	let low = 2.220446049250313e-16;
-	let high = MAX_SEARCH_STIFFNESS;
+	let high = MAX_SEARCH_STIFFNESS * slowModeStiffnessScale(zeta);
 	const direction =
-		energyFractionAtSettle(high, x0, v0, config) >= energyFractionAtSettle(low, x0, v0, config)
+		energyFractionAtSettle(high, x0, v0, zeta, config) >= energyFractionAtSettle(low, x0, v0, zeta, config)
 			? 1
 			: -1;
 	let current = (high + low) / 2;
 	let remaining = 100;
 	while (
-		Math.abs(energyFractionAtSettle(current, x0, v0, config) - threshold) > precision &&
+		Math.abs(energyFractionAtSettle(current, x0, v0, zeta, config) - threshold) > precision &&
 		remaining > 0
 	) {
 		remaining -= 1;
-		if ((energyFractionAtSettle(current, x0, v0, config) - threshold) * direction < 0) {
+		if ((energyFractionAtSettle(current, x0, v0, zeta, config) - threshold) * direction < 0) {
 			low = current;
 		} else {
 			high = current;
@@ -287,16 +302,16 @@ function startSpring(
 	let zeta: float64 = 0;
 	let omega0: float64 = 0;
 	if (!instant && (x0 !== 0 || v0 !== 0)) {
-		if (config.useDuration) {
-			stiffness = stiffnessForDuration(x0, v0, config);
-			zeta = config.dampingRatio;
-		} else {
-			zeta = config.damping / (2 * Math.sqrt(stiffness * config.mass));
-		}
-		omega0 = Math.sqrt(stiffness / config.mass);
+		zeta = config.useDuration
+			? config.dampingRatio
+			: config.damping / (2 * Math.sqrt(stiffness * config.mass));
 		if (config.clampMin !== null || config.clampMax !== null) {
 			zeta = zetaToMatchClamps(zeta, x0, to, config.clampMin, config.clampMax);
 		}
+		if (config.useDuration) {
+			stiffness = stiffnessForDuration(x0, v0, zeta, config);
+		}
+		omega0 = Math.sqrt(stiffness / config.mass);
 	}
 	const initialEnergy = energy(x0, v0, stiffness, config.mass);
 	return assemble(config, stiffness, zeta, omega0, initialEnergy, from, to, v0, instant);

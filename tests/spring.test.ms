@@ -79,6 +79,25 @@ test "the duration family resolves the stiffness the reference finds and then fo
 	assert near(critical.velocity(150), 3.6716239337876697, 1e-6);
 }
 
+function restsAtSettle(config: SpringConfig, from: float64, to: float64, velocityPerSecond: float64): boolean {
+	const settleMs = config.durationMs * 1.5;
+	const spring = createSpring(config, from, to, velocityPerSecond);
+	return !spring.isDone(settleMs * 0.99) && spring.isDone(settleMs * 1.01);
+}
+
+test "an over-damped duration spring rests at its settling time" {
+	assert restsAtSettle(springByDuration(550, 2, 4), 0, 100, 0);
+	assert restsAtSettle(springByDuration(550, 1.5, 4), 0, 100, 0);
+	assert restsAtSettle(springByDuration(300, 2, 1), 0, 100, 400);
+	assert restsAtSettle(springByDuration(550, 5, 4), 0, 100, 0);
+}
+
+test "a clamp that lifts the ratio above one still rests at the settling time" {
+	const clamped: SpringConfig = { ...springByDuration(500, 0.5, 1), clampMax: 100.1 };
+	assert createSpring(clamped, 0, 100).zeta > 1;
+	assert restsAtSettle(clamped, 0, 100, 0);
+}
+
 test "a duration of zero is already at the target" {
 	const spring = createSpring(springByDuration(0, 0.5, 1), 3, 9);
 	assert spring.position(0) === 9;
