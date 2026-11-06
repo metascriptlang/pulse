@@ -211,6 +211,23 @@ test "loop resets and replays for its iterations, then ends finished" {
 	assert seen.filter((v: float64): boolean => v === 1).length === 3;
 }
 
+test "a loop an end handler starts is stopped and reported when the interrupting call supersedes it" {
+	const scene = new Scene();
+	const spin = scene.value(0);
+	const looped = new Ends();
+	const outer = new Ends();
+	spin.animate(linear(1, 100), (finished: boolean): void => {
+		if (!finished) { loop(animation(spin, linear(-1, 100))).start(looped.handler); }
+	});
+	scene.manual.advance(50);
+	spin.animate(linear(2, 100), outer.handler);
+	assert looped.cancelled === 1 && looped.finished === 0;
+	assert scene.manual.pending() === 1;
+	scene.manual.advance(100);
+	assert spin.get() === 2 && outer.finished === 1;
+	assert looped.cancelled === 1 && !spin.isAnimating();
+}
+
 test "an endless loop runs until it is stopped" {
 	const scene = new Scene();
 	const spin = scene.value(0);

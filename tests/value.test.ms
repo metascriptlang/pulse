@@ -151,6 +151,47 @@ test "a new animation interrupts the running one, which ends unfinished once" {
 	assert clock.pending() === 0;
 }
 
+test "an end handler that animates again is superseded by the call that interrupted it" {
+	const clock = new ManualClock();
+	const value = new AnimatedValue(0, clock.clock, new MotionPolicy());
+	const inner = new Ends();
+	const outer = new Ends();
+	value.animate(linear(100, 100), (finished: boolean): void => {
+		if (!finished) { value.animate(linear(-50, 100), inner.handler); }
+	});
+	clock.advance(40);
+	const seen: float64[] = [];
+	value.subscribe((v: float64): void => { seen.push(v); });
+	value.animate(linear(200, 100), outer.handler);
+	assert inner.cancelled === 1 && inner.finished === 0;
+	assert clock.pending() === 1;
+	clock.advance(50);
+	assert value.get() === 120;
+	clock.advance(50);
+	assert value.get() === 200;
+	assert outer.finished === 1 && outer.cancelled === 0;
+	assert inner.cancelled === 1 && inner.finished === 0;
+	assert seen.every((v: float64): boolean => v >= 40), "no frame of the superseded run writes";
+	assert clock.pending() === 0;
+}
+
+test "set supersedes an animation an end handler starts while set interrupts" {
+	const clock = new ManualClock();
+	const value = new AnimatedValue(0, clock.clock, new MotionPolicy());
+	const inner = new Ends();
+	value.animate(linear(100, 100), (finished: boolean): void => {
+		if (!finished) { value.animate(linear(-50, 100), inner.handler); }
+	});
+	clock.advance(40);
+	value.set(7);
+	assert value.get() === 7;
+	assert inner.cancelled === 1 && inner.finished === 0;
+	assert !value.isAnimating();
+	assert clock.pending() === 0;
+	clock.advance(100);
+	assert value.get() === 7;
+}
+
 test "a timing over a running timing to the same target keeps its timeline" {
 	const clock = new ManualClock();
 	const value = new AnimatedValue(0, clock.clock, new MotionPolicy());

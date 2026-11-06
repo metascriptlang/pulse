@@ -604,19 +604,19 @@ export class AnimatedValue {
 	}
 
 	private interrupt(): Run | null {
-		const running = this.running;
-		if (running === null) {
-			return null;
+		let superseded: Run | null = null;
+		while (this.running !== null) {
+			superseded = this.running;
+			this.running = null;
+			if (this.frameId !== 0) {
+				this.clock.cancel(this.frameId);
+				this.frameId = 0;
+			}
+			const onEnd = this.onEnd;
+			this.onEnd = null;
+			if (onEnd !== null) { onEnd(false); }
 		}
-		this.running = null;
-		if (this.frameId !== 0) {
-			this.clock.cancel(this.frameId);
-			this.frameId = 0;
-		}
-		const onEnd = this.onEnd;
-		this.onEnd = null;
-		if (onEnd !== null) { onEnd(false); }
-		return running;
+		return superseded;
 	}
 
 	private onReplaced(): () => void {
