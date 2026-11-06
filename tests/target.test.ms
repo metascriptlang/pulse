@@ -117,14 +117,17 @@ test "an older player that holds no target is cancelled without completing" {
 	const sink = new Sink();
 	const older = player(clock, [ramp("x", 0, 100)], [sink.binding("older")]);
 	let completed: int32 = 0;
+	let interrupted: int32 = 0;
 	older.onComplete = (): void => { completed += 1; };
+	older.onInterrupt = (): void => { interrupted += 1; };
 	clock.advance(500);
 	player(clock, [ramp("x", 300, 400)], [sink.binding("newer")]);
 	clock.advance(100);
 	assert older.cancelled && older.paused;
 	assert sink.target.writers === 1;
+	assert interrupted === 1;
 	clock.advance(1000);
-	assert completed === 0;
+	assert completed === 0 && interrupted === 1;
 	assert near(older.time, 600);
 }
 
@@ -137,6 +140,8 @@ test "replacing one property leaves the older player's other properties running"
 		[ramp("x", 0, 100), ramp("y", 0, 10)],
 		[sink.binding("older"), other.binding("older", "y")],
 	);
+	let interrupted: int32 = 0;
+	older.onInterrupt = (): void => { interrupted += 1; };
 	clock.advance(500);
 	player(clock, [ramp("x", 300, 400)], [sink.binding("newer")]);
 	clock.advance(100);
@@ -147,6 +152,7 @@ test "replacing one property leaves the older player's other properties running"
 	assert other.last().writer === "older" && near(other.last().value, 8);
 	clock.advance(300);
 	assert near(other.last().value, 10);
+	assert interrupted === 0;
 }
 
 test "blend sums two numeric players and settles on the newer end" {

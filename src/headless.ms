@@ -158,6 +158,9 @@ class Stage {
 		player.onReverseComplete = (): void => {
 			emit("reverseComplete");
 		};
+		player.onInterrupt = (): void => {
+			emit("interrupt");
+		};
 		return {
 			play: (): void => {
 				player.play();

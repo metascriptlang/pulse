@@ -84,7 +84,7 @@ Sources: `~/projects/refs-animation/` (tarballs; `COMMITS` there): Theatre `6ea8
 | colour | `evaluate.ms` `interpolate` | Theatre `core/src/propTypes/index.ts:508-526`, `utils/src/color.ts:80-150` (Oklab) |
 | clock split | `clock.ms` | Flutter `scheduler/ticker.dart:24,291,313` |
 | playback | `player.ms` | GSAP `gsap-core.js` `class Animation` :1148-1470 |
-| cancel, revert | `player.ms` | anime `timer/timer.js`, `animation/animation.js` |
+| cancel, revert | `player.ms` | anime `timer/timer.js`, `animation/animation.js`; `onInterrupt` GSAP `_interrupt` :646-650 |
 | composition | `compose.ms` | GSAP `_parentToChildTotalTime` :245, `_addToTimeline` :287, `Timeline.render` :1537-1669, `_parsePosition` :390-412 |
 | stagger | `compose.ms` `stagger` | anime `utils/stagger.js` |
 | spring | `spring.ms` | Reanimated `animation/spring/springUtils.ts:162-395`, `springConfigs.ts:6-95`; Flutter `physics/spring_simulation.dart` (overdamped) |
@@ -237,6 +237,13 @@ What an app relies on, the same on every backend:
   (the prototype's choice); restoring a baseline is a separate decision. Finish on an endless
   repeat played forwards is refused with `motion: …`, as WAAPI's `finish()` throws
   `InvalidStateError` on an infinite end;
+- **events:** a player calls `onStart`, `onUpdate`, `onRepeat`, `onComplete`,
+  `onReverseComplete` and `onInterrupt`. `onInterrupt` has GSAP's meaning (`_interrupt`
+  :646-650, `kill` :2584, :2632): `cancel`, `revert`, or losing every target to a replacing
+  writer stops a player short of its end, including one that never rendered, because a GSAP tween
+  is parented from creation with progress 0. A pause, a seek, a second cancel and a cancel after
+  completion fire nothing; `dispose` drops every callback without calling one. An animated value
+  reports the same stop as `onEnd(false)`;
 - **retarget:** starts from the current state, and a spring keeps its velocity;
 - **contention:** two writers of one property are replace, blend or an error, never an implicit
   "last write wins";

@@ -61,6 +61,7 @@ class Events {
 		player.onRepeat = (): void => { this.log.push("repeat"); };
 		player.onComplete = (): void => { this.log.push("complete"); };
 		player.onReverseComplete = (): void => { this.log.push("reverseComplete"); };
+		player.onInterrupt = (): void => { this.log.push("interrupt"); };
 	}
 
 	count(name: string): int32 {
@@ -454,6 +455,47 @@ test "cancel keeps the current value, releases the frame, and a later play reviv
 	assert !rig.player.cancelled && rig.clock.pending() === 1;
 	rig.clock.advance(100);
 	assert near(rig.probe.last(), 30);
+}
+
+test "cancel before completion interrupts once; pause and seek do not" {
+	const rig = plain();
+	rig.clock.advance(200);
+	rig.player.pause();
+	rig.player.seek(500, false);
+	rig.player.play();
+	assert rig.events.count("interrupt") === 0;
+	rig.player.cancel();
+	rig.player.cancel();
+	assert rig.events.count("interrupt") === 1;
+	assert rig.events.log[rig.events.log.length - 1] === "interrupt";
+	rig.player.play();
+	rig.player.cancel();
+	assert rig.events.count("interrupt") === 2, "a revived player interrupts again";
+}
+
+test "a completed player does not interrupt when cancelled" {
+	const rig = plain();
+	rig.clock.advance(1000);
+	assert rig.events.count("complete") === 1;
+	rig.player.cancel();
+	rig.player.play();
+	rig.player.revert();
+	assert rig.events.count("interrupt") === 0;
+}
+
+test "a player cancelled before its first render interrupts" {
+	const rig = new Rig((options: MotionOptions): MotionOptions => ({ ...options, paused: true }));
+	rig.player.cancel();
+	assert rig.events.count("interrupt") === 1 && rig.probe.writes.length === 0;
+}
+
+test "revert before completion interrupts after writing the read value" {
+	const rig = plain();
+	rig.clock.advance(500);
+	let restored: float64 = -1;
+	rig.player.onInterrupt = (): void => { restored = rig.probe.last(); };
+	rig.player.revert();
+	assert restored === 7;
 }
 
 test "revert writes the value read at the first render, then holds" {

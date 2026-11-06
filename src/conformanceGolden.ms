@@ -83,7 +83,7 @@ export const CONFORMANCE_GOLDEN: ConformanceTrace[] = [
 		name: "cancel.holds",
 		error: "",
 		checkpoints: [
-			{ at: 400, values: [40], events: ["p:start"] },
+			{ at: 400, values: [40], events: ["p:start", "p:interrupt"] },
 			{ at: 800, values: [40], events: [] },
 			{ at: 1200, values: [70], events: [] },
 			{ at: 1600, values: [100], events: ["p:complete"] },
@@ -178,7 +178,7 @@ export const CONFORMANCE_GOLDEN: ConformanceTrace[] = [
 		checkpoints: [
 			{ at: 250, values: [25], events: ["p:start"] },
 			{ at: 500, values: [50], events: [] },
-			{ at: 750, values: [75], events: ["q:start"] },
+			{ at: 750, values: [75], events: ["q:start", "p:interrupt"] },
 			{ at: 1000, values: [50], events: [] },
 			{ at: 1500, values: [0], events: ["q:complete"] },
 			{ at: 1700, values: [0], events: [] },
@@ -197,7 +197,7 @@ export const CONFORMANCE_GOLDEN: ConformanceTrace[] = [
 		name: "lifecycle.revert",
 		error: "",
 		checkpoints: [
-			{ at: 300, values: [7], events: ["p:start"] },
+			{ at: 300, values: [7], events: ["p:start", "p:interrupt"] },
 			{ at: 600, values: [7], events: [] },
 		],
 	},

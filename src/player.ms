@@ -132,6 +132,7 @@ export class MotionPlayer {
 	onRepeat: (() => void) | null = null;
 	onComplete: (() => void) | null = null;
 	onReverseComplete: (() => void) | null = null;
+	onInterrupt: (() => void) | null = null;
 
 	private targets: ActiveTarget[];
 	private clock: Clock;
@@ -325,10 +326,12 @@ export class MotionPlayer {
 
 	cancel(): void {
 		this.live();
+		const interrupted = this.interruptible();
 		this.isPaused = true;
 		this.isCancelled = true;
 		this.releaseTargets(true);
 		this.sync();
+		if (interrupted) { this.interrupted(); }
 	}
 
 	revert(): void {
@@ -338,6 +341,7 @@ export class MotionPlayer {
 				fail("cannot revert: binding " + target.binding.slot + "." + target.binding.property + " has no read");
 			}
 		}
+		const interrupted = this.interruptible();
 		this.isPaused = true;
 		this.isCancelled = true;
 		this.releaseTargets(false);
@@ -356,6 +360,7 @@ export class MotionPlayer {
 		this.playhead = -this.delayTime;
 		this.renderedTotalTime = 0;
 		this.renderedTime = 0;
+		if (interrupted) { this.interrupted(); }
 	}
 
 	dispose(): void {
@@ -368,10 +373,20 @@ export class MotionPlayer {
 		this.onRepeat = null;
 		this.onComplete = null;
 		this.onReverseComplete = null;
+		this.onInterrupt = null;
 	}
 
 	private live(): void {
 		if (this.isDisposed) { fail("player is disposed"); }
+	}
+
+	private interruptible(): boolean {
+		return !this.isCancelled && this.renderedTotalTime < this.totalDur;
+	}
+
+	private interrupted(): void {
+		const listener = this.onInterrupt;
+		if (listener !== null) { listener(); }
 	}
 
 	private checkedScale(value: float64): float64 {
