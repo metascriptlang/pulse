@@ -630,7 +630,7 @@ export class AnimatedValue {
 		const claim = this.claim;
 		const target = this.target;
 		this.claim = null;
-		if (claim !== null && target !== null) { target.release(claim); }
+		if (claim !== null && target !== null) { target.release(claim, true); }
 	}
 
 	private output(value: float64): float64 {
@@ -639,7 +639,7 @@ export class AnimatedValue {
 		if (claim === null || target === null || this.composition !== Composition.Blend) {
 			return value;
 		}
-		return target.blended(claim, numberValue(value), LABEL).number;
+		return target.blended(claim, numberValue(value), 0, LABEL).number;
 	}
 
 	private write(value: float64): void {

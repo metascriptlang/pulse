@@ -51,6 +51,8 @@ class ActiveTarget {
 	writers: ComposedTrack[] = [];
 	reached: boolean[] = [];
 	claim: TargetClaim | null = null;
+	claimedAt: float64 = 0;
+	endsAt: float64 = 0;
 	lost: boolean = false;
 
 	constructor(binding: MotionBinding) {
@@ -78,6 +80,12 @@ function cycleIndex(totalTime: float64, cycle: float64): int32 {
 	const ratio = roundPrecise(totalTime / cycle);
 	const whole = Math.floor(ratio);
 	return (ratio !== 0 && whole === ratio ? whole - 1 : whole) as int32;
+}
+
+function offsetLeft(target: ActiveTarget, totalTime: float64): float64 {
+	const span = target.endsAt - target.claimedAt;
+	if (span === 0) { return 0; }
+	return Math.min(Math.max((target.endsAt - totalTime) / span, 0), 1);
 }
 
 function compile(doc: MotionDocument, bindings: MotionBinding[]): ActiveTarget[] {
@@ -319,7 +327,7 @@ export class MotionPlayer {
 		this.live();
 		this.isPaused = true;
 		this.isCancelled = true;
-		this.releaseTargets();
+		this.releaseTargets(true);
 		this.sync();
 	}
 
@@ -332,7 +340,7 @@ export class MotionPlayer {
 		}
 		this.isPaused = true;
 		this.isCancelled = true;
-		this.releaseTargets();
+		this.releaseTargets(false);
 		this.sync();
 		if (this.initted) {
 			for (let i: int32 = 0; i < this.targets.length; i += 1) {
@@ -353,7 +361,7 @@ export class MotionPlayer {
 	dispose(): void {
 		this.live();
 		this.isDisposed = true;
-		this.releaseTargets();
+		this.releaseTargets(true);
 		this.sync();
 		this.onStart = null;
 		this.onUpdate = null;
@@ -510,12 +518,12 @@ export class MotionPlayer {
 			const index = writerAt(target.writers, target.reached, time);
 			if (index < 0 || target.lost) { continue; }
 			const writer = target.writers[index];
-			const value = this.held(target, sampleTrack(writer.track, writer.localTime(time)));
+			const value = this.held(target, sampleTrack(writer.track, writer.localTime(time)), totalTime);
 			if (this.superseded(serial)) { return; }
 			target.binding.write(value);
 			if (this.superseded(serial)) { return; }
 		}
-		if (this.scale > 0 ? totalTime === total : totalTime === 0) { this.releaseTargets(); }
+		if (this.scale > 0 ? totalTime === total : totalTime === 0) { this.releaseTargets(true); }
 		if (!suppressEvents) {
 			const listener = this.onUpdate;
 			if (listener !== null) { listener(); }
@@ -535,7 +543,7 @@ export class MotionPlayer {
 		}
 	}
 
-	private held(target: ActiveTarget, value: MotionValue): MotionValue {
+	private held(target: ActiveTarget, value: MotionValue, totalTime: float64): MotionValue {
 		const identity = target.binding.target;
 		if (identity === null || this.composition === Composition.None) { return value; }
 		const blend = this.composition === Composition.Blend;
@@ -551,8 +559,10 @@ export class MotionPlayer {
 				(): void => this.replaced(target),
 			);
 			target.claim = claim;
+			target.claimedAt = totalTime;
+			target.endsAt = this.scale < 0 ? 0 : this.totalDur;
 		}
-		return blend ? identity.blended(claim, value, target.label) : value;
+		return blend ? identity.blended(claim, value, offsetLeft(target, totalTime), target.label) : value;
 	}
 
 	private endValue(target: ActiveTarget): MotionValue {
@@ -569,11 +579,11 @@ export class MotionPlayer {
 		if (this.targets.every((other: ActiveTarget): boolean => other.lost)) { this.cancel(); }
 	}
 
-	private releaseTargets(): void {
+	private releaseTargets(hold: boolean): void {
 		for (const target of this.targets) {
 			const claim = target.claim;
 			const identity = target.binding.target;
-			if (claim !== null && identity !== null) { identity.release(claim); }
+			if (claim !== null && identity !== null) { identity.release(claim, hold); }
 			target.claim = null;
 			target.lost = false;
 		}

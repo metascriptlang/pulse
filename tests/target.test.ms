@@ -2,6 +2,7 @@ import { Easing } from "../src/easing";
 import { ManualClock } from "../src/clock";
 import {
 	MotionDocument,
+	MotionKeyframe,
 	MotionTrack,
 	MotionValue,
 	ValueKind,
@@ -227,12 +228,173 @@ test "blend composes colour per channel" {
 		null,
 		(): void => {},
 	);
-	const out = target.blended(first, colorValue(0.5, 0, 0, 1), "fill");
+	const out = target.blended(first, colorValue(0.5, 0, 0, 1), 0, "fill");
 	assert near(out.color.r, 0.5) && near(out.color.a, 1);
 	assert refusal((): void => {
 		const ignore = (): void => {};
 		target.claim(Composition.Blend, numberValue(0), numberValue(1), "fill", null, ignore);
 	}) === "motion: fill blends a number with a colour";
+}
+
+function roundTrip(peak: float64, back: float64): MotionTrack {
+	return {
+		slot: "box",
+		property: "x",
+		kind: ValueKind.Number,
+		keyframes: [
+			linearKeyframe("a", 0, 0),
+			linearKeyframe("b", 500, peak),
+			linearKeyframe("c", 1000, back),
+		],
+	};
+}
+
+function blendWith(
+	clock: ManualClock,
+	tracks: MotionTrack[],
+	bindings: MotionBinding[],
+	delay: float64,
+	repeat: int32 = 0,
+	yoyo: boolean = false,
+): MotionPlayer {
+	const settings: MotionOptions = {
+		...options(clock, Composition.Blend),
+		delay,
+		repeat,
+		yoyo,
+	};
+	return new MotionPlayer(document(tracks), bindings, settings);
+}
+
+test "a round-trip track joins a blend in flight and fades the join offset" {
+	const clock = new ManualClock();
+	const sink = new Sink();
+	player(clock, [ramp("x", 0, 100)], [sink.binding("a")], Composition.Blend);
+	clock.advance(500);
+	blendWith(clock, [roundTrip(100, 0)], [sink.binding("b")], 100);
+	clock.advance(100);
+	assert near(sink.last().value, 60), sink.last().value.toString();
+	clock.advance(400);
+	assert near(sink.last().value, 140), sink.last().value.toString();
+	clock.advance(100);
+	assert near(sink.last().value, 150), sink.last().value.toString();
+	clock.advance(500);
+	assert near(sink.last().value, 0) && sink.target.writers === 0;
+}
+
+test "a yoyo with an odd repeat ends where it starts and still joins a blend" {
+	const clock = new ManualClock();
+	const sink = new Sink();
+	player(clock, [ramp("x", 0, 100)], [sink.binding("a")], Composition.Blend);
+	clock.advance(500);
+	blendWith(clock, [ramp("x", 0, 10)], [sink.binding("b")], 100, 1, true);
+	clock.advance(100);
+	assert near(sink.last().value, 60), sink.last().value.toString();
+	clock.advance(1000);
+	assert near(sink.last().value, 60), sink.last().value.toString();
+	clock.advance(1000);
+	assert near(sink.last().value, 0) && sink.target.writers === 0;
+}
+
+test "a near round trip joining a blend stays bounded" {
+	const clock = new ManualClock();
+	const sink = new Sink();
+	player(clock, [ramp("x", 0, 100)], [sink.binding("a")], Composition.Blend);
+	clock.advance(500);
+	blendWith(clock, [roundTrip(100, 0.001)], [sink.binding("b")], 100);
+	let previous = sink.last().value;
+	let jump: float64 = 0;
+	for (let frame: int32 = 0; frame < 12; frame += 1) {
+		clock.advance(100);
+		assert Math.abs(sink.last().value) <= 200, sink.last().value.toString();
+		jump = Math.max(jump, Math.abs(sink.last().value - previous));
+		previous = sink.last().value;
+	}
+	assert jump <= 30, jump.toString();
+	assert near(sink.last().value, 0.001) && sink.target.writers === 0;
+}
+
+test "cancelling a blended player mid-flight holds its contribution" {
+	const clock = new ManualClock();
+	const sink = new Sink();
+	player(clock, [ramp("x", 0, 100)], [sink.binding("a")], Composition.Blend);
+	clock.advance(500);
+	const b = player(clock, [ramp("x", 0, 10)], [sink.binding("b")], Composition.Blend);
+	clock.advance(200);
+	assert near(sink.last().value, 70), sink.last().value.toString();
+	b.cancel();
+	clock.advance(100);
+	assert sink.last().writer === "a" && near(sink.last().value, 80), sink.last().value.toString();
+	clock.advance(200);
+	assert near(sink.last().value, 100) && sink.target.writers === 0;
+}
+
+test "cancelling a blended animated value mid-flight holds its contribution" {
+	const clock = new ManualClock();
+	const target = new MotionTarget();
+	const policy = new MotionPolicy();
+	const a = new AnimatedValue(0, clock.clock, policy, target, Composition.Blend);
+	const b = new AnimatedValue(0, clock.clock, policy, target, Composition.Blend);
+	a.animate(timing(100, { duration: 1000, easing: Easing.linear }));
+	clock.advance(500);
+	b.animate(timing(10, { duration: 1000, easing: Easing.linear }));
+	clock.advance(250);
+	assert near(b.get(), 52.5);
+	b.cancel();
+	clock.advance(250);
+	assert near(a.get(), 77.5) && target.writers === 0;
+}
+
+class ColorSink {
+	target: MotionTarget = new MotionTarget();
+	values: MotionValue[] = [];
+
+	binding(): MotionBinding {
+		return {
+			slot: "box",
+			property: "fill",
+			write: (value: MotionValue): void => { this.values.push(value); },
+			read: null,
+			target: this.target,
+		};
+	}
+
+	last(): MotionValue {
+		return this.values[this.values.length - 1];
+	}
+}
+
+function colorKeyframe(id: string, time: float64, r: float64, g: float64, b: float64): MotionKeyframe {
+	return { ...linearKeyframe(id, time, 0), value: colorValue(r, g, b, 1) };
+}
+
+function colorTrack(keyframes: MotionKeyframe[]): MotionTrack {
+	return { slot: "box", property: "fill", kind: ValueKind.Color, keyframes };
+}
+
+test "a round-trip colour track joins a blend in flight per channel" {
+	const clock = new ManualClock();
+	const sink = new ColorSink();
+	const grey = colorTrack([colorKeyframe("a", 0, 0, 0, 0), colorKeyframe("b", 1000, 1, 1, 1)]);
+	player(clock, [grey], [sink.binding()], Composition.Blend);
+	clock.advance(500);
+	const before = sink.last();
+	const pulse = colorTrack([
+		colorKeyframe("a", 0, 0, 0, 0),
+		colorKeyframe("b", 500, 1, 0, 0),
+		colorKeyframe("c", 1000, 0, 0, 0),
+	]);
+	blendWith(clock, [pulse], [sink.binding()], 100);
+	clock.advance(100);
+	for (let frame: int32 = 0; frame < 11; frame += 1) {
+		const shown = sink.last().color;
+		assert Math.abs(shown.r) <= 3 && Math.abs(shown.g) <= 2 && near(shown.a, 1), shown.r.toString();
+		clock.advance(100);
+	}
+	assert before.color.g > 0;
+	const last = sink.last().color;
+	assert near(last.r, 0) && near(last.g, 0) && near(last.b, 0) && near(last.a, 1);
+	assert sink.target.writers === 0;
 }
 
 test "blend refuses an animated value without a fixed end" {

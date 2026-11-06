@@ -9,20 +9,20 @@ export enum Composition {
 export class TargetClaim {
 	composition: Composition;
 	end: MotionValue;
-	scale: float64[];
+	offset: MotionValue;
 	delta: MotionValue;
 	onReplaced: () => void;
 
 	constructor(
 		composition: Composition,
 		end: MotionValue,
-		scale: float64[],
+		offset: MotionValue,
 		delta: MotionValue,
 		onReplaced: () => void,
 	) {
 		this.composition = composition;
 		this.end = end;
-		this.scale = scale;
+		this.offset = offset;
 		this.delta = delta;
 		this.onReplaced = onReplaced;
 	}
@@ -46,27 +46,21 @@ function sameKind(a: MotionValue, b: MotionValue, label: string): void {
 	if (a.kind !== b.kind) { fail(label + " blends a number with a colour"); }
 }
 
-function plus(a: MotionValue, b: MotionValue, label: string): MotionValue {
+function combine(a: MotionValue, b: MotionValue, weight: float64, label: string): MotionValue {
 	sameKind(a, b, label);
 	const left = channels(a);
 	const right = channels(b);
 	const out: float64[] = [];
-	for (let i: int32 = 0; i < left.length; i += 1) { out.push(left[i] + right[i]); }
+	for (let i: int32 = 0; i < left.length; i += 1) { out.push(left[i] + right[i] * weight); }
 	return fromChannels(a.kind, out);
 }
 
-function scaledDelta(
-	value: MotionValue,
-	end: MotionValue,
-	scale: float64[],
-	label: string,
-): MotionValue {
-	sameKind(value, end, label);
-	const current = channels(value);
-	const last = channels(end);
-	const out: float64[] = [];
-	for (let i: int32 = 0; i < current.length; i += 1) { out.push((current[i] - last[i]) * scale[i]); }
-	return fromChannels(value.kind, out);
+function plus(a: MotionValue, b: MotionValue, label: string): MotionValue {
+	return combine(a, b, 1, label);
+}
+
+function minus(a: MotionValue, b: MotionValue, label: string): MotionValue {
+	return combine(a, b, -1, label);
 }
 
 export class MotionTarget {
@@ -117,28 +111,15 @@ export class MotionTarget {
 		const claimed = this.onClaim;
 		if (claimed !== null) { claimed(); }
 		if (composition === Composition.Replace) {
-			const claim = new TargetClaim(composition, end, [1], numberValue(0), onReplaced);
+			const claim = new TargetClaim(composition, end, numberValue(0), numberValue(0), onReplaced);
 			this.replaceAll(claim, previous);
 			return claim;
 		}
 		const from = this.blendFrom(previous, start, label);
-		sameKind(from, end, label);
 		sameKind(start, end, label);
-		const towards = channels(from);
-		const own = channels(start);
-		const last = channels(end);
-		const scale: float64[] = [];
-		for (let i: int32 = 0; i < last.length; i += 1) {
-			if (own[i] !== last[i]) {
-				scale.push((towards[i] - last[i]) / (own[i] - last[i]));
-			} else if (towards[i] !== last[i]) {
-				fail(label + " starts where it ends and cannot join a blend in flight");
-			} else {
-				scale.push(1);
-			}
-		}
-		const delta = scaledDelta(start, end, scale, label);
-		const claim = new TargetClaim(composition, end, scale, delta, onReplaced);
+		const offset = minus(from, start, label);
+		const delta = minus(from, end, label);
+		const claim = new TargetClaim(composition, end, offset, delta, onReplaced);
 		if (this.claims.length > 0 && this.claims[0].composition === Composition.Replace) {
 			this.replaceAll(claim, previous);
 		} else {
@@ -149,14 +130,17 @@ export class MotionTarget {
 		return claim;
 	}
 
-	blended(claim: TargetClaim, value: MotionValue, label: string): MotionValue {
-		claim.delta = scaledDelta(value, claim.end, claim.scale, label);
+	blended(claim: TargetClaim, value: MotionValue, offsetLeft: float64, label: string): MotionValue {
+		claim.delta = combine(minus(value, claim.end, label), claim.offset, offsetLeft, label);
 		let out = this.base;
 		for (const other of this.claims) { out = plus(out, other.delta, label); }
 		return out;
 	}
 
-	release(claim: TargetClaim): void {
+	release(claim: TargetClaim, hold: boolean): void {
+		if (hold && claim.composition === Composition.Blend && this.claims.includes(claim)) {
+			this.base = plus(this.base, claim.delta, "a released writer");
+		}
 		this.drop(claim);
 	}
 
