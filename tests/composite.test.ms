@@ -211,6 +211,21 @@ test "loop resets and replays for its iterations, then ends finished" {
 	assert seen.filter((v: float64): boolean => v === 1).length === 3;
 }
 
+test "under reduced motion a loop runs one iteration and ends finished, as Reanimated's withRepeat" {
+	const scene = new Scene();
+	scene.policy = new MotionPolicy(true);
+	const spin = scene.value(0);
+	const ends = new Ends();
+	loop(animation(spin, linear(1, 100)), -1, true, scene.policy).start(ends.handler);
+	scene.manual.advance(16);
+	assert spin.get() === 1 && ends.finished === 1, "one reduced iteration: " + spin.get().toString();
+	assert !spin.isAnimating() && scene.manual.pending() === 0;
+	const counted = new Ends();
+	loop(animation(spin, linear(0, 100)), 3, true, scene.policy).start(counted.handler);
+	scene.manual.advance(16);
+	assert spin.get() === 0 && counted.finished === 1;
+}
+
 test "a loop an end handler starts is stopped and reported when the interrupting call supersedes it" {
 	const scene = new Scene();
 	const spin = scene.value(0);

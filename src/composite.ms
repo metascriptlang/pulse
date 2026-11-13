@@ -154,6 +154,7 @@ export function loop(
 	animation: CompositeAnimation,
 	iterations: int32 = -1,
 	resetBeforeIteration: boolean = true,
+	policy: MotionPolicy = new MotionPolicy(),
 ): CompositeAnimation {
 	if (iterations < -1) {
 		fail("loop iterations must be -1 or more, got " + iterations.toString());
@@ -165,7 +166,8 @@ export function loop(
 	return {
 		start: (onEnd: ((finished: boolean) => void) | null): void => {
 			const restart = (finished: boolean): void => {
-				if (isFinished || iterationsSoFar === iterations || !finished) {
+				if (isFinished || iterationsSoFar === iterations || !finished ||
+					(policy.reducedMotion && iterationsSoFar === 1)) {
 					report(onEnd, finished);
 					return;
 				}
