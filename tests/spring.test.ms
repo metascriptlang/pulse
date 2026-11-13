@@ -170,12 +170,13 @@ test "retarget keeps position and velocity of the moving spring" {
 	assert moved.position(20000) === 3;
 }
 
-test "retarget against the carried velocity keeps it and turns around smoothly" {
+test "retarget drops a velocity that points away from the new target, as Reanimated's spring onStart" {
 	const spring = createSpring(springByStiffness(100, 10, 1), 0, 1);
+	assert spring.velocity(100) > 5, "the spring moves toward 1";
 	const reversed = spring.retarget(100, -1);
-	assert near(reversed.velocity(0), spring.velocity(100), 1e-12);
-	assert reversed.velocity(0) > 5;
-	assert reversed.position(20) > reversed.position(0), "it keeps moving away before it turns";
+	assert near(reversed.position(0), spring.position(100), 1e-12);
+	assert near(reversed.velocity(0), 0, 1e-9), "velocity " + reversed.velocity(0).toString();
+	assert reversed.position(20) < reversed.position(0), "it heads for the new target at once";
 	assert reversed.position(20000) === -1;
 }
 

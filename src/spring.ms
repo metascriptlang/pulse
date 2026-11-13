@@ -399,5 +399,6 @@ export function retarget(this s: SpringSimulation, tMs: float64, to: float64): S
 	if (to === s.to) {
 		return assemble(s.config, s.stiffness, s.zeta, s.omega0, s.initialEnergy, x, to, v, false);
 	}
-	return startSpring(s.config, x, to, v);
+	const away = (to > x && v < 0) || (to < x && v > 0);
+	return startSpring(s.config, x, to, away ? 0 : v);
 }

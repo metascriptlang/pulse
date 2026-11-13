@@ -133,7 +133,8 @@ test "a retarget joins two sampled springs with continuous value and velocity" {
 	const joint: int32 = 12;
 	const firstStep = stepMs(firstCurve);
 	const tMs = (joint as float64) * firstStep;
-	const second = first.retarget(tMs, 40);
+	assert first.velocity(tMs) > 0 && first.position(tMs) < 140, "the new target lies ahead of the motion";
+	const second = first.retarget(tMs, 140);
 	const secondCurve = sampleSpring(second);
 	const secondStep = stepMs(secondCurve);
 	assert second.from === first.position(tMs);
