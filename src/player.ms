@@ -157,6 +157,7 @@ export class MotionPlayer {
 	private renderSerial: int32 = 0;
 	private frameId: int32 = 0;
 	private lastFrameTime: float64 = 0;
+	private ticking = false;
 
 	constructor(doc: MotionDocument, bindings: MotionBinding[], options: MotionOptions) {
 		this.targets = compile(doc, bindings);
@@ -433,7 +434,7 @@ export class MotionPlayer {
 			return;
 		}
 		if (this.frameId === 0) {
-			this.lastFrameTime = this.clock.now();
+			if (!this.ticking) { this.lastFrameTime = this.clock.now(); }
 			this.requestFrame();
 		}
 	}
@@ -455,7 +456,12 @@ export class MotionPlayer {
 		const delta = Math.max(0, time - this.lastFrameTime);
 		this.lastFrameTime = time;
 		const next = Math.min(Math.max(this.playhead + delta * this.scale, lowest), this.totalDur);
-		this.moveTo(next, false);
+		this.ticking = true;
+		try {
+			this.moveTo(next, false);
+		} finally {
+			this.ticking = false;
+		}
 		if (this.wantsFrame() && this.frameId === 0) { this.requestFrame(); }
 	}
 

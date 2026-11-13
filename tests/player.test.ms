@@ -1,4 +1,4 @@
-import { ManualClock } from "../src/clock";
+import { Clock, ManualClock } from "../src/clock";
 import { MotionDocument, MotionValue, ValueKind, linearKeyframe, numberValue } from "../src/document";
 import { MotionBinding, MotionOptions, MotionPlayer, motionOptions } from "../src/player";
 import { ScrollAxis, scrollSource } from "../src/scroll";
@@ -112,6 +112,28 @@ test "a playing player advances by the clock delta and writes the sampled value"
 	rig.clock.advance(250);
 	assert near(rig.probe.last(), 50);
 	assert rig.clock.pending() === 1, "one frame is requested at a time";
+}
+
+function stampedPlayer(manual: ManualClock, stampOffset: float64): MotionPlayer {
+	const stamped: Clock = {
+		now: (): float64 => manual.time,
+		request: (callback: (time: float64) => void): int32 =>
+			manual.request((time: float64): void => { callback(time + stampOffset); }),
+		cancel: (id: int32): void => { manual.cancel(id); },
+	};
+	return new MotionPlayer(rampDocument(), [new Probe().binding(true)], motionOptions(stamped));
+}
+
+test "a running player advances by the distance between frame stamps, wherever now() sits beside them" {
+	for (const offset of [16, -16]) {
+		const manual = new ManualClock();
+		const player = stampedPlayer(manual, offset);
+		manual.advance(100);
+		const first = player.time;
+		manual.advance(100);
+		manual.advance(100);
+		assert near(player.time - first, 200), `stamps ${offset} ms from now(): ${player.time - first}`;
+	}
 }
 
 test "a player created paused holds no frame and writes nothing until played" {
