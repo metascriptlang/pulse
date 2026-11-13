@@ -132,6 +132,13 @@ Nothing traced so far needed a **NEW MECHANISM**: every part is a port of one of
 - **Refusals instead of warnings or silent defaults.** An invalid spring config, an empty
   `sequence()`, an unknown label, an unreadable or percent position, and a placement that ends
   after its parent's duration all throw `motion: …`. The references warn, snap, or substitute 0.
+- **Three composites refuse or reset where React Native goes on** (`693e9628e8c`). `divide` by a
+  zero divisor throws `motion: divide by zero`, where `AnimatedDivision.js:46-60` logs once and
+  returns 0, a value the author never wrote. `parallel` clears each child's ended flag when it
+  starts, where `parallelImpl` clears it only in `reset` (`AnimatedImplementation.js:374-418`), so a
+  second `start` without `reset` still stops every running child together. An endless `loop`
+  whose iteration ends inside its own `start` throws, where `loopImpl` recurses until the stack
+  overflows (`:463-487`).
 - **The root clip's duration is authoritative.** GSAP grows a timeline to fit its children
   (`totalDuration` :1929); Theatre stores the length (`Sequence.ts:188-211`). The editor and the
   runtime read one stored number.
@@ -264,11 +271,14 @@ What an app relies on, the same on every backend:
   is parented from creation with progress 0. A pause, a seek, a second cancel and a cancel after
   completion fire nothing; `dispose` drops every callback without calling one. An animated value
   reports the same stop as `onEnd(false)`;
-- **retarget:** starts from the current state, and a spring keeps its velocity;
+- **retarget:** starts from the current state; a spring keeps its velocity when it points toward
+  the new target and drops it to 0 when it points away, as Reanimated's spring `onStart` clips it
+  (`spring.ts:189-197`);
 - **contention:** two writers of one property are replace, blend or an error, never an implicit
   "last write wins";
 - **lifecycle:** what a player and its callbacks do when a target unmounts or is disposed;
-- **reduced motion:** one policy with one meaning everywhere;
+- **reduced motion:** one policy with one meaning everywhere; under it `loop` runs one iteration
+  and ends finished, as Reanimated's `withRepeat` does (`repeat.ts:69-72`);
 - **capability:** when a backend falls back to the evaluator, and what it refuses. In the
   browser (`waapi.ms` `BrowserMotionPlayer`) a track goes to WAAPI only when its property is in
   the CSS table, it is the property's only writer, its placement starts at 0, its keyframes lie
