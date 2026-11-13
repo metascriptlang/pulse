@@ -228,6 +228,30 @@ running and hands over the new motion, as motion's `NativeAnimationExtended.ts:1
 seek, cancel and contention keep one meaning. A property that changes layout (`width`, `left`)
 runs on the app's thread on every platform.
 
+### Under a controlled clock
+
+An agent, a test or the editor's timeline may run an app on a clock it steps instead of the wall
+(alloium `docs/TIME-MACHINE.md`, "Time, execution and effects are separate contracts"). Pulse
+needs no change for it: every player and value already takes its `Clock`. The open part is the
+compositor, which keeps its own time. Approved as the direction by the person (2026-11-14), not
+built: each handed track reports one route under its session's clock policy.
+
+| route | engine | how it follows the session's clock |
+|---|---|---|
+| engine-following | Core Animation | `speed = 0` and `timeOffset` on an ancestor layer hold every sublayer's animations at a stepped time; Neon's conformance harness passes the suite this way on macOS and the iOS simulator (Neon `examples/layerMotion/harness.m` `motionLayerClock`, `tests/ios/conformance.sh`), not yet proven per session (takeover and resume mapping, layers attached later, other windows) |
+| engine-following | WAAPI | pause, then `currentTime` = clock - start, as Exact does (`host/web-js/agent.js:303-311` at `23b69617`), scroll-driven animations excluded (`:297-298`) |
+| evaluator | DirectComposition | no clock control and no readback (Neon `src/platform/windows/bridge.cpp` `niLayerPresented`), so the track runs on the evaluator while the clock is controlled, or is refused by name |
+| not participating | unmanaged native motion | a `UIView.animate` or a native module's animation runs on the wall and is reported, never claimed as stepped |
+
+Exact draws the same managed-versus-unmanaged line: it holds its own lowered Core Animation at
+`speed = 0` (`host/apple/Sources/ExactKit/SvgScene.swift:86,189`) and waits a bounded wall time
+for unmanaged motion, reporting `motion` when it is still running
+(`IOS/AgentMotionIOS.swift:52-60,189-192`, `Agent.swift:951-958`). A session's settle condition
+counts each running player or value with its finite end time, or as endless (a loop, a repeat),
+since an infinite animation never settles (Exact `motion/src/engine.rs:803-842`). Until the routes
+exist, a controlled run reports every handed track as not participating, because a handed track
+runs on the wall whatever Neon's `FrameDriver` says.
+
 Void off the app's thread is not in the target. It needs a thread pinned to one OS thread for the
 GPU device, which ULTRALOCK does not have (M1, V2); WASM has no threads in MetaScript's emcc
 runtime, and browser threads need COOP/COEP. Bevy samples animation on the app side and renders an
